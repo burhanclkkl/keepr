@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="k-gradient" x1="0" y1="0" x2="0" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+  </defs>
+  <!-- K shape paths -->
+  <path d="M22 14V50 M22 32L42 14 M29 25.5L42 50" stroke="url(#k-gradient)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

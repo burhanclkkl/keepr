@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#ffffff" />
+    <title>Keepr — Akıllı Dijital Kitaplık & Bağlantı Havuzu</title>
+    <meta name="description" content="200 sekme mi açık? Keepr, 'bunu sonra okuyorum' diyerek kapattığınız ve unuttuğunuz tüm bağlantıları, makaleleri ve web sayfalarını düzenli klasörlerde toplar." />
+    <!-- Open Graph (OG) / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Keepr — Akıllı Dijital Kitaplık & Bağlantı Havuzu" />
+    <meta property="og:description" content="Sekmelerinizde kaybolmayın. Linklerinizi kaydetmek, kategorilemek ve sabitlemek için en minimalist dijital kütüphane." />
+    <meta property="og:image" content="/favicon.svg" />
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:title" content="Keepr — Akıllı Dijital Kitaplık & Bağlantı Havuzu" />
+    <meta property="twitter:description" content="Sekmelerinizde kaybolmayın. Linklerinizi kaydetmek, kategorilemek ve sabitlemek için en minimalist dijital kütüphane." />
+    <meta property="twitter:image" content="/favicon.svg" />
+    <link rel="canonical" href="https://keepr.co" />
+    <!-- Inline theme init: runs synchronously before React to prevent FOUC -->
+    <script>
+      (function () {
+        try {
+          // Theme color palettes (must match ThemeContext.tsx THEME_COLORS)
+          var palettes = {
+            indigo: { hex: '#4f46e5', hover: '#4338ca', light: 'rgba(79,70,229,0.08)' },
+            emerald: { hex: '#10b981', hover: '#059669', light: 'rgba(16,185,129,0.08)' },
+            blue:    { hex: '#3b82f6', hover: '#2563eb', light: 'rgba(59,130,246,0.08)' },
+            rose:    { hex: '#f43f5e', hover: '#e11d48', light: 'rgba(244,63,94,0.08)' },
+            amber:   { hex: '#f59e0b', hover: '#d97706', light: 'rgba(245,158,11,0.08)' },
+          };
+
+          // Try to read stored user data from localStorage
+          var themeMode = 'light';
+          var themeColor = 'emerald';
+          var raw = localStorage.getItem('keepr_user_prefs');
+          if (raw) {
+            var prefs = JSON.parse(raw);
+            if (prefs.theme_mode === 'dark') themeMode = 'dark';
+            if (palettes[prefs.theme_color]) themeColor = prefs.theme_color;
+          } else {
+            themeMode = 'light';
+            themeColor = 'emerald';
+          }
+
+          var root = document.documentElement;
+          var palette = palettes[themeColor];
+
+          // Apply dark mode class immediately
+          if (themeMode === 'dark') root.classList.add('dark');
+
+          // Apply accent CSS variables immediately
+          root.style.setProperty('--color-accent', palette.hex);
+          root.style.setProperty('--color-accent-hover', palette.hover);
+          root.style.setProperty('--color-accent-light', palette.light);
+          root.style.setProperty('--color-accent-dark-light', palette.light);
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

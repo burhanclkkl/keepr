@@ -87,6 +87,15 @@ export const SharedCollectionView: React.FC<SharedCollectionViewProps> = ({ slug
     } else {
       root.classList.remove('dark');
     }
+    // Sync with keepr_user_prefs in localStorage
+    const saved = localStorage.getItem('keepr_user_prefs');
+    let prefs = {};
+    if (saved) {
+      try {
+        prefs = JSON.parse(saved);
+      } catch {}
+    }
+    localStorage.setItem('keepr_user_prefs', JSON.stringify({ ...prefs, theme_mode: isDarkMode ? 'dark' : 'light' }));
   }, [isDarkMode]);
 
   const getDomain = (urlStr: string) => {
@@ -112,14 +121,20 @@ export const SharedCollectionView: React.FC<SharedCollectionViewProps> = ({ slug
   const filteredSubcategories = useMemo(() => {
     if (!searchVal.trim()) return subcategories;
     const query = searchVal.toLowerCase();
-    return subcategories.map(sub => ({
-      ...sub,
-      keeps: sub.keeps.filter(k =>
-        (k.title && k.title.toLowerCase().includes(query)) ||
-        (k.description && k.description.toLowerCase().includes(query)) ||
-        k.url.toLowerCase().includes(query)
-      )
-    })).filter(sub => sub.keeps.length > 0);
+    return subcategories.map(sub => {
+      const folderMatches = sub.name.toLowerCase().includes(query);
+      if (folderMatches) {
+        return sub; // If the folder name matches, return it fully with all its keeps
+      }
+      return {
+        ...sub,
+        keeps: sub.keeps.filter(k =>
+          (k.title && k.title.toLowerCase().includes(query)) ||
+          (k.description && k.description.toLowerCase().includes(query)) ||
+          k.url.toLowerCase().includes(query)
+        )
+      };
+    }).filter(sub => sub.keeps.length > 0);
   }, [subcategories, searchVal]);
 
   const renderKeepCard = (keep: SharedKeep) => (
@@ -203,7 +218,7 @@ export const SharedCollectionView: React.FC<SharedCollectionViewProps> = ({ slug
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0a0a0a] flex flex-col select-none">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0a0a0a] flex flex-col select-none animate-in fade-in duration-300">
       
       {/* Premium Header Bar */}
       <header className="sticky top-0 z-40 bg-white/80 dark:bg-[#0a0a0a]/80 backdrop-blur-md border-b border-slate-100 dark:border-[#1c1c1e] px-4 md:px-8 py-3.5 flex items-center justify-between transition-colors">
@@ -314,10 +329,16 @@ export const SharedCollectionView: React.FC<SharedCollectionViewProps> = ({ slug
                     </span>
                   </button>
                   {isExpanded && (
-                    <div className="p-6 border-t border-slate-50 dark:border-[#1c1c1e]/60 bg-slate-50/20 dark:bg-[#121212]/20">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {sub.keeps.map(renderKeepCard)}
-                      </div>
+                    <div className="p-6 border-t border-slate-50 dark:border-[#1c1c1e]/60 bg-slate-50/20 dark:bg-[#121212]/20 animate-in fade-in duration-200">
+                      {sub.keeps.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {sub.keeps.map(renderKeepCard)}
+                        </div>
+                      ) : (
+                        <p className="text-center text-[11px] text-slate-400 dark:text-slate-500 py-2">
+                          Bu alt klasörde henüz bağlantı bulunmuyor.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

@@ -15,8 +15,10 @@ from app.models.login_attempt import LoginAttempt
 from app.utils.auth_helpers import generate_token, generate_refresh_token, token_required, check_pro_access
 from app.utils.security_helpers import validate_password_strength
 from app.utils.audit import log_audit
+from app.utils.errors import server_error
 from app.utils.verification_helpers import generate_otp, hash_otp, reset_verification_fields
-from app.utils.mail_helper import send_verification_email_async
+from app.utils.mail_helper import send_verification_email_async, send_password_reset_email_async
+from app.models.password_reset import PasswordReset
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -113,7 +115,7 @@ def register():
                 }), 200
             except Exception as e:
                 db.session.rollback()
-                return jsonify({'error': f'Kayıt işlemi sırasında bir hata oluştu: {str(e)}'}), 500
+                return server_error('Kayıt işlemi sırasında bir hata oluştu.')
         
     try:
         # 3. Create new user
@@ -173,7 +175,7 @@ def register():
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Kayıt işlemi sırasında bir hata oluştu: {str(e)}'}), 500
+        return server_error('Kayıt işlemi sırasında bir hata oluştu.')
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
@@ -185,10 +187,10 @@ def login():
     if not email or not password:
         return jsonify({'error': 'Lütfen e-posta ve şifrenizi girin.'}), 400
         
+    # remote_addr güvenilir: proxy arkasındaysa ProxyFix ayarlar, değilse
+    # gerçek istemci IP'sidir. Ham XFF header'ına GÜVENİLMEZ (spoofing).
     ip_address = request.remote_addr
-    if request.headers.get('X-Forwarded-For'):
-        ip_address = request.headers.get('X-Forwarded-For').split(',')[0].strip()
-        
+
     # Rate Limit Check
     fifteen_mins_ago = datetime.utcnow() - timedelta(minutes=15)
     thirty_mins_ago = datetime.utcnow() - timedelta(minutes=30)
@@ -434,7 +436,7 @@ def update_profile(current_user):
         }), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Güncelleme sırasında hata oluştu: {str(e)}'}), 500
+        return server_error('Güncelleme sırasında hata oluştu.')
 
 @auth_bp.route('/me', methods=['DELETE'])
 @token_required
@@ -458,7 +460,7 @@ def delete_account(current_user):
         return jsonify({'message': 'Hesabınız ve tüm verileriniz kalıcı olarak silindi.'}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Hesap silinirken hata oluştu: {str(e)}'}), 500
+        return server_error('Hesap silinirken hata oluştu.')
 
 @auth_bp.route('/verify-code', methods=['POST'])
 def verify_code():
@@ -513,7 +515,7 @@ def verify_code():
                 return create_auth_response(user), 200
             except Exception as e:
                 db.session.rollback()
-                return jsonify({'error': f'Doğrulama sırasında bir hata oluştu: {str(e)}'}), 500
+                return server_error('Doğrulama sırasında bir hata oluştu.')
                 
     # If code did not match or expired
     try:
@@ -580,14 +582,166 @@ def resend_code():
         log_audit(user.id, 'OTP_RESENT', 'Verification code regenerated and resent')
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Kod gönderilirken bir sorun oluştu: {str(e)}'}), 500
+        return server_error('Kod gönderilirken bir sorun oluştu.')
         
     return generic_success
+
+@auth_bp.route('/forgot-password', methods=['POST'])
+def forgot_password():
+    """Şifre sıfırlama kodu ister. Kullanıcı sayımını (enumeration) önlemek için
+    her durumda generic başarı yanıtı döner."""
+    data = request.get_json() or {}
+    email = (data.get('email') or '').strip()
+
+    generic_success = (jsonify({
+        'message': 'Eğer bu e-posta kayıtlıysa, şifre sıfırlama kodu gönderildi.'
+    }), 200)
+
+    if not email:
+        return jsonify({'error': 'E-posta adresi zorunludur.'}), 400
+
+    user = db.session.execute(
+        db.select(User).filter_by(email=email)
+    ).scalar_one_or_none()
+
+    # Kullanıcı yoksa veya doğrulanmamışsa: sızıntı yapma, generic dön.
+    if not user or not user.is_verified:
+        time.sleep(0.1)
+        return generic_success
+
+    now = datetime.utcnow()
+
+    # Cooldown: son 60 sn içinde istek varsa sessizce yenisini gönderme.
+    last_reset = db.session.execute(
+        db.select(PasswordReset).filter_by(user_id=user.id)
+        .order_by(PasswordReset.created_at.desc())
+    ).scalars().first()
+    if last_reset and (now - last_reset.created_at).total_seconds() < 60:
+        return generic_success
+
+    try:
+        # Önceki kullanılmamış kodları geçersiz kıl.
+        db.session.execute(
+            db.update(PasswordReset)
+            .where(PasswordReset.user_id == user.id, PasswordReset.used == False)
+            .values(used=True)
+        )
+        code = generate_otp()
+        reset = PasswordReset(
+            user_id=user.id,
+            code_hash=hash_otp(code),
+            expires_at=now + timedelta(minutes=15),
+            attempts=0,
+            used=False,
+        )
+        db.session.add(reset)
+        db.session.commit()
+
+        send_password_reset_email_async(email, code)
+        log_audit(user.id, 'PASSWORD_RESET_REQUESTED', 'Password reset code generated and sent')
+    except Exception:
+        db.session.rollback()
+        return server_error('Şifre sıfırlama isteği işlenirken bir hata oluştu.')
+
+    return generic_success
+
+
+@auth_bp.route('/reset-password', methods=['POST'])
+def reset_password():
+    """E-posta + kod + yeni şifre ile şifreyi sıfırlar. Başarılıysa tüm
+    oturumlar (refresh token) iptal edilir."""
+    data = request.get_json() or {}
+    email = (data.get('email') or '').strip()
+    code = (data.get('code') or '').strip()
+    new_password = data.get('new_password') or data.get('password')
+
+    if not email or not code or not new_password:
+        return jsonify({'error': 'E-posta, kod ve yeni şifre zorunludur.'}), 400
+
+    generic_error = jsonify({'error': 'Girdiğiniz kod geçersiz veya süresi dolmuş.'}), 400
+
+    if not re.match(r'^\d{6}$', code):
+        return generic_error
+
+    user = db.session.execute(
+        db.select(User).filter_by(email=email)
+    ).scalar_one_or_none()
+    if not user:
+        # Timing/enumeration azaltma: dummy hmac
+        hmac.new(b'dummy-secret', code.encode(), hashlib.sha256).hexdigest()
+        return generic_error
+
+    now = datetime.utcnow()
+    reset = db.session.execute(
+        db.select(PasswordReset).filter_by(user_id=user.id, used=False)
+        .order_by(PasswordReset.created_at.desc())
+    ).scalars().first()
+
+    if not reset or reset.is_expired():
+        return generic_error
+
+    # Deneme limiti (brute-force koruması)
+    if reset.attempts >= 5:
+        reset.used = True
+        db.session.commit()
+        log_audit(user.id, 'PASSWORD_RESET_LOCKED', 'Too many invalid reset code attempts')
+        return jsonify({'error': 'Çok fazla hatalı deneme. Lütfen yeni bir sıfırlama kodu isteyin.'}), 429
+
+    # Sabit zamanlı karşılaştırma
+    if not hmac.compare_digest(reset.code_hash, hash_otp(code)):
+        try:
+            reset.attempts += 1
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        log_audit(user.id, 'PASSWORD_RESET_FAILED', 'Invalid reset code attempt')
+        return generic_error
+
+    # Kod doğru — yeni şifreyi doğrula
+    password_error = validate_password_strength(new_password, user.username, user.email)
+    if password_error:
+        return jsonify({'error': password_error}), 400
+
+    # Son 5 şifre tekrarını engelle
+    history = db.session.execute(
+        db.select(PasswordHistory).filter_by(user_id=user.id)
+        .order_by(PasswordHistory.created_at.desc()).limit(5)
+    ).scalars().all()
+    for entry in history:
+        if check_password_hash(entry.password_hash, new_password):
+            return jsonify({'error': 'Yeni şifreniz son 5 şifrenizden biri olamaz.'}), 400
+
+    try:
+        user.set_password(new_password)
+        db.session.add(PasswordHistory(user_id=user.id, password_hash=user.password_hash))
+        reset.used = True
+        # GÜVENLİK: şifre değişince tüm aktif oturumları iptal et.
+        db.session.execute(
+            db.update(RefreshToken).where(RefreshToken.user_id == user.id).values(revoked=True)
+        )
+        db.session.commit()
+        log_audit(user.id, 'PASSWORD_RESET_SUCCESS', 'Password reset successfully; all sessions revoked')
+    except Exception:
+        db.session.rollback()
+        return server_error('Şifre sıfırlanırken bir hata oluştu.')
+
+    return jsonify({'message': 'Şifreniz başarıyla sıfırlandı. Lütfen yeni şifrenizle giriş yapın.'}), 200
+
 
 @auth_bp.route('/upgrade-mock', methods=['POST'])
 @token_required
 def upgrade_mock(current_user):
-    """Mocks upgrading/toggling a user's subscription to Pro or Team."""
+    """Mocks upgrading/toggling a user's subscription to Pro or Team.
+
+    GÜVENLİK: Bu endpoint ödeme doğrulaması YAPMAZ; herhangi bir kullanıcının
+    kendini ücretsiz Pro/Team yapmasına izin verir. Üretimde ASLA erişilebilir
+    olmamalıdır — yalnızca geliştirme/demo ortamında çalışır.
+    """
+    from flask import current_app
+    if current_app.config.get('IS_PRODUCTION'):
+        log_audit(current_user.id, 'MOCK_UPGRADE_BLOCKED',
+                  'Attempt to use mock upgrade endpoint in production')
+        return jsonify({'error': 'Bu işlem kullanılamıyor.'}), 404
     try:
         if current_user.is_pro:
             current_user.is_pro = False
@@ -621,5 +775,5 @@ def upgrade_mock(current_user):
         import traceback
         print("❌ Error inside upgrade_mock route:")
         traceback.print_exc()
-        return jsonify({'error': f'Abonelik işlemi sırasında hata oluştu: {str(e)}'}), 500
+        return server_error('Abonelik işlemi sırasında hata oluştu.')
 

@@ -2,6 +2,7 @@ import secrets
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 from app.database import db
+from app.utils.errors import server_error
 from app.models.category import Category
 from app.models.category_collaborator import CategoryCollaborator
 from app.models.invitation import Invitation
@@ -56,14 +57,14 @@ def create_invitation(current_user):
         
         # Safe log_audit call
         try:
-            log_audit(current_user.id, 'create_invitation', ip_address=request.remote_addr, details=f"Created {role} invite for category {category.name}")
+            log_audit(current_user.id, 'create_invitation', details=f"Created {role} invite for category {category.name}")
         except Exception:
             pass
             
         return jsonify(invitation.to_dict()), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Davet linki oluşturulamadı: {str(e)}'}), 500
+        return server_error('Davet linki oluşturulamadı.')
 
 @collaborations_bp.route('/invite/<string:token>', methods=['GET'])
 def get_invitation_details(token):
@@ -123,7 +124,7 @@ def accept_invitation(current_user, token):
         db.session.commit()
         
         try:
-            log_audit(current_user.id, 'accept_invitation', ip_address=request.remote_addr, details=f"Joined category {category.name} as {invitation.role}")
+            log_audit(current_user.id, 'accept_invitation', details=f"Joined category {category.name} as {invitation.role}")
         except Exception:
             pass
             
@@ -133,7 +134,7 @@ def accept_invitation(current_user, token):
         }), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Davet kabul edilirken hata oluştu: {str(e)}'}), 500
+        return server_error('Davet kabul edilirken hata oluştu.')
 
 @collaborations_bp.route('/collaborators/category/<int:category_id>', methods=['GET'])
 @token_required
@@ -179,11 +180,11 @@ def remove_collaborator(current_user, collaborator_id):
         db.session.commit()
         
         try:
-            log_audit(current_user.id, 'remove_collaborator', ip_address=request.remote_addr, details=f"Removed user {collaborator.user_id} from category {category.name}")
+            log_audit(current_user.id, 'remove_collaborator', details=f"Removed user {collaborator.user_id} from category {category.name}")
         except Exception:
             pass
             
         return jsonify({'message': 'Üye başarıyla çıkarıldı.'}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Üye çıkarılırken hata oluştu: {str(e)}'}), 500
+        return server_error('Üye çıkarılırken hata oluştu.')

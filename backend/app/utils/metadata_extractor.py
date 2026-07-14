@@ -1,6 +1,7 @@
 import cloudscraper
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
+from app.utils.url_guard import assert_url_is_safe, safe_get, SafeUrlError
 
 def extract_metadata(url):
     """
@@ -30,6 +31,13 @@ def extract_metadata(url):
         domain = "Bilinmeyen Bağlantı"
         metadata['title'] = domain
 
+    # SSRF koruması: iç ağ/özel adresleri en baştan reddet.
+    try:
+        assert_url_is_safe(url)
+    except SafeUrlError:
+        # Güvenli olmayan URL için scraping yapma; yalnızca domain başlığı döner.
+        return metadata
+
     # Fetch and extract title
     try:
         # Create a cloudscraper session to bypass bot protection
@@ -40,7 +48,8 @@ def extract_metadata(url):
                 'desktop': True
             }
         )
-        response = scraper.get(url, headers=headers, timeout=5, allow_redirects=True)
+        # Her yönlendirme adımında yeniden doğrulayan SSRF-güvenli GET.
+        response = safe_get(scraper, url, headers=headers, timeout=5, max_redirects=5)
         if response.status_code == 200:
             # Auto-detect correct encoding (e.g. utf-8, windows-1254) for Turkish characters
             response.encoding = response.apparent_encoding

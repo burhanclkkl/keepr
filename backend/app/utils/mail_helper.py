@@ -4,6 +4,23 @@ import threading
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+
+def _is_production():
+    return os.environ.get('FLASK_ENV', 'development').lower() == 'production'
+
+
+def _log_otp_fallback(email, code):
+    """OTP fallback log'u. GÜVENLİK: Üretimde kodu ASLA log'a yazma."""
+    if _is_production():
+        print(f"[MAIL ERROR] SMTP yapılandırılmamış/başarısız — {email} için doğrulama kodu gönderilemedi. "
+              f"(Kod güvenlik nedeniyle log'a yazılmadı.)")
+    else:
+        print(f"\n[MAIL FALLBACK - SMTP NOT CONFIGURED / DEV ONLY]")
+        print(f"To: {email}")
+        print(f"Verification Code: {code}")
+        print(f"--------------------------------------\n")
+
+
 def _send_email_task(email, code):
     """Internal SMTP task that executes in a background daemon thread."""
     # Read environment configurations with safe defaults
@@ -15,13 +32,9 @@ def _send_email_task(email, code):
     mail_from_name = os.environ.get('MAIL_FROM_NAME', 'Keepr')
     mail_from_email = os.environ.get('MAIL_FROM_EMAIL', mail_username or 'no-reply@keepr.app')
     
-    # Validation check: if no SMTP configured, print to logs as fallback
+    # Validation check: if no SMTP configured, fall back (kod üretimde loglanmaz)
     if not mail_server or not mail_port or not mail_username or not mail_password:
-        print(f"\n[MAIL FALLBACK - SMTP NOT CONFIGURED]")
-        print(f"To: {email}")
-        print(f"Subject: Keepr Doğrulama Kodu")
-        print(f"Verification Code: {code}")
-        print(f"--------------------------------------\n")
+        _log_otp_fallback(email, code)
         return
         
     try:
@@ -183,12 +196,63 @@ def _send_email_task(email, code):
         print(f"[MAIL SUCCESS] Verification code sent to {email}")
     except Exception as e:
         print(f"[MAIL ERROR] Failed to send SMTP email to {email}: {str(e)}")
-        # Print fallback to console so the user gets the code even on SMTP failure
-        print(f"[MAIL FALLBACK - SMTP CRASHED] Code for {email}: {code}")
+        # Fallback (dev'de kodu göster, üretimde ASLA)
+        _log_otp_fallback(email, code)
 
 def send_verification_email_async(email, code):
     """Dispatches verification email in a background daemon thread to avoid blocking client API requests."""
     thread = threading.Thread(target=_send_email_task, args=(email, code))
+    thread.daemon = True
+    thread.start()
+
+
+def _send_password_reset_task(email, code):
+    """Şifre sıfırlama kodunu e-posta ile gönderir (arka plan thread'i)."""
+    mail_server = os.environ.get('MAIL_SERVER')
+    mail_port = os.environ.get('MAIL_PORT')
+    mail_username = os.environ.get('MAIL_USERNAME')
+    mail_password = os.environ.get('MAIL_PASSWORD')
+    mail_use_tls = os.environ.get('MAIL_USE_TLS', 'True').lower() == 'true'
+    mail_from_name = os.environ.get('MAIL_FROM_NAME', 'Keepr')
+    mail_from_email = os.environ.get('MAIL_FROM_EMAIL', mail_username or 'no-reply@keepr.app')
+
+    if not mail_server or not mail_port or not mail_username or not mail_password:
+        _log_otp_fallback(email, code)
+        return
+    try:
+        mail_port = int(mail_port)
+    except ValueError:
+        print(f"[MAIL ERROR] Invalid mail port: {mail_port}")
+        return
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = 'Keepr Şifre Sıfırlama Kodu'
+    msg['From'] = f"{mail_from_name} <{mail_from_email}>"
+    msg['To'] = email
+    text = (f"Keepr şifrenizi sıfırlamak için tek kullanımlık kodunuz: {code}\n"
+            f"Bu kod 15 dakika boyunca geçerlidir. Bu isteği siz yapmadıysanız bu e-postayı yok sayın.")
+    html = f"""<div style="font-family:sans-serif"><p>Şifre sıfırlama kodunuz:</p>
+    <p style="font-size:28px;font-weight:bold;letter-spacing:4px">{code}</p>
+    <p>Bu kod 15 dakika geçerlidir. Bu isteği siz yapmadıysanız yok sayın.</p></div>"""
+    msg.attach(MIMEText(text, 'plain'))
+    msg.attach(MIMEText(html, 'html'))
+
+    try:
+        server = smtplib.SMTP(mail_server, mail_port)
+        if mail_use_tls:
+            server.starttls()
+        server.login(mail_username, mail_password)
+        server.sendmail(mail_from_email, email, msg.as_string())
+        server.quit()
+        print(f"[MAIL SUCCESS] Password reset code sent to {email}")
+    except Exception as e:
+        print(f"[MAIL ERROR] Failed to send reset email to {email}: {str(e)}")
+        _log_otp_fallback(email, code)
+
+
+def send_password_reset_email_async(email, code):
+    """Şifre sıfırlama kodunu arka plan thread'inde gönderir."""
+    thread = threading.Thread(target=_send_password_reset_task, args=(email, code))
     thread.daemon = True
     thread.start()
 

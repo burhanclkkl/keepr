@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from app.database import db
+from app.utils.errors import server_error
 from app.models.category import Category
 from app.utils.auth_helpers import token_required
 
@@ -76,7 +77,7 @@ def create_category(current_user):
         return jsonify(category.to_dict()), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Kategori oluşturulurken bir hata oluştu: {str(e)}'}), 500
+        return server_error('Kategori oluşturulurken bir hata oluştu.')
 
 @categories_bp.route('/<int:category_id>', methods=['PUT'])
 @token_required
@@ -130,7 +131,7 @@ def update_category(current_user, category_id):
         return jsonify(category.to_dict()), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Kategori güncellenirken bir hata oluştu: {str(e)}'}), 500
+        return server_error('Kategori güncellenirken bir hata oluştu.')
 
 @categories_bp.route('/<int:category_id>', methods=['DELETE'])
 @token_required
@@ -146,7 +147,7 @@ def delete_category(current_user, category_id):
         return jsonify({'message': 'Kategori başarıyla silindi. Bağlantılar silinmedi.'}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Kategori silinirken bir hata oluştu: {str(e)}'}), 500
+        return server_error('Kategori silinirken bir hata oluştu.')
 
 @categories_bp.route('/<int:category_id>/share', methods=['POST'])
 @token_required
@@ -185,7 +186,7 @@ def toggle_category_share(current_user, category_id):
         return jsonify(category.to_dict()), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Paylaşım ayarları kaydedilemedi: {str(e)}'}), 500
+        return server_error('Paylaşım ayarları kaydedilemedi.')
 
 @categories_bp.route('/shared/<string:share_slug>', methods=['GET'])
 def get_shared_category(share_slug):

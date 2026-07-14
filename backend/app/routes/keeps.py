@@ -7,6 +7,7 @@ from app.models.category import Category
 from app.utils.auth_helpers import token_required, check_pro_access
 from app.utils.metadata_extractor import extract_metadata
 from app.utils.audit import log_audit
+from app.utils.errors import server_error
 
 keeps_bp = Blueprint('keeps', __name__)
 
@@ -127,7 +128,7 @@ def create_keep(current_user):
         return jsonify(keep.to_dict()), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Bağlantı kaydedilirken hata oluştu: {str(e)}'}), 500
+        return server_error('Bağlantı kaydedilirken hata oluştu.')
 
 @keeps_bp.route('/<int:keep_id>', methods=['PUT'])
 @token_required
@@ -212,7 +213,7 @@ def update_keep(current_user, keep_id):
         return jsonify(keep.to_dict()), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Bağlantı güncellenirken hata oluştu: {str(e)}'}), 500
+        return server_error('Bağlantı güncellenirken hata oluştu.')
 
 @keeps_bp.route('/<int:keep_id>', methods=['DELETE'])
 @token_required
@@ -243,7 +244,7 @@ def delete_keep(current_user, keep_id):
         return jsonify({'message': 'Bağlantı başarıyla silindi.'}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Bağlantı silinirken hata oluştu: {str(e)}'}), 500
+        return server_error('Bağlantı silinirken hata oluştu.')
 
 @keeps_bp.route('/bulk-delete', methods=['POST'])
 @token_required
@@ -263,7 +264,7 @@ def bulk_delete_keeps(current_user):
         return jsonify({'message': f'{len(keep_ids)} bağlantı başarıyla silindi.'}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Toplu silme işlemi sırasında hata oluştu: {str(e)}'}), 500
+        return server_error('Toplu silme işlemi sırasında hata oluştu.')
 
 @keeps_bp.route('/bulk-favorite', methods=['POST'])
 @token_required
@@ -294,7 +295,7 @@ def bulk_favorite_keeps(current_user):
         return jsonify({'message': f'{len(keep_ids)} bağlantının favori durumu güncellendi.'}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'İşlem sırasında hata oluştu: {str(e)}'}), 500
+        return server_error('İşlem sırasında hata oluştu.')
 
 @keeps_bp.route('/bulk-pin', methods=['POST'])
 @token_required
@@ -325,7 +326,7 @@ def bulk_pin_keeps(current_user):
         return jsonify({'message': f'{len(keep_ids)} bağlantının sabitleme durumu güncellendi.'}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'İşlem sırasında hata oluştu: {str(e)}'}), 500
+        return server_error('İşlem sırasında hata oluştu.')
 
 @keeps_bp.route('/bulk-move', methods=['POST'])
 @token_required
@@ -358,7 +359,7 @@ def bulk_move_keeps(current_user):
         return jsonify({'message': f'{len(keep_ids)} bağlantı başarıyla taşındı.'}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'İşlem sırasında hata oluştu: {str(e)}'}), 500
+        return server_error('İşlem sırasında hata oluştu.')
 
 @keeps_bp.route('/<int:keep_id>/reminder', methods=['POST'])
 @token_required

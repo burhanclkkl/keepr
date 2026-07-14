@@ -7,6 +7,7 @@ import {
   Bookmark, Video, ShoppingBag, FileText, Heart, Pin, X,
 } from 'lucide-react';
 import { VerificationView } from './VerificationView';
+import { ForgotPasswordView } from './ForgotPasswordView';
 import appLogo from '../../assets/logo.png';
 
 // Floating mini bookmark card shown in left panel as visual demo
@@ -60,8 +61,8 @@ export const AuthForm: React.FC<AuthFormProps> = ({ initialRegister = false, onS
   const [isLoading, setIsLoading] = useState(false);
   const [shake, setShake] = useState(false);
 
-  // Email verification (OTP) and KVKK consent states
-  const [viewMode, setViewMode] = useState<'form' | 'verify'>('form');
+  // Email verification (OTP), password reset and KVKK consent states
+  const [viewMode, setViewMode] = useState<'form' | 'verify' | 'forgot'>('form');
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState('');
   const [kvkkAccepted, setKvkkAccepted] = useState(false);
   const [kvkkModalOpen, setKvkkModalOpen] = useState(false);
@@ -130,6 +131,15 @@ export const AuthForm: React.FC<AuthFormProps> = ({ initialRegister = false, onS
         email={pendingVerificationEmail}
         onBack={() => setViewMode('form')}
         onSuccess={onSuccess || (() => {})}
+      />
+    );
+  }
+
+  if (viewMode === 'forgot') {
+    return (
+      <ForgotPasswordView
+        initialEmail={email}
+        onBack={() => setViewMode('form')}
       />
     );
   }
@@ -225,9 +235,20 @@ export const AuthForm: React.FC<AuthFormProps> = ({ initialRegister = false, onS
 
         {/* Password */}
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Şifre
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Şifre
+            </label>
+            {!isRegister && (
+              <button
+                type="button"
+                onClick={() => setViewMode('forgot')}
+                className="text-[10px] font-bold text-accent hover:underline cursor-pointer bg-transparent border-none p-0"
+              >
+                Şifremi unuttum?
+              </button>
+            )}
+          </div>
           <div className="relative">
             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
               <Lock size={16} />

@@ -287,48 +287,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         {keepCounts[category.id] || 0}
                       </span>
                       <div className="hidden group-hover:flex items-center gap-1">
-                        {/* Add Subfolder Button (Team gated) */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!isTeam) {
-                              openProModal('folder');
-                              return;
-                            }
-                            setAddSubcatParentId(addSubcatParentId === category.id ? null : category.id);
-                          }}
-                          className="p-1 rounded-apple-sm text-slate-400 hover:text-accent hover:bg-slate-50 dark:hover:bg-[#1c1c1e]/50 cursor-pointer transition-colors flex items-center gap-0.5"
-                          title="Alt Klasör Ekle"
-                        >
-                          {!isTeam && <Lock size={8} className="text-amber-500" />}
-                          <Plus size={11} />
-                        </button>
+                        {/* Add Subfolder Button (Team gated for owner, allowed for editor) */}
+                        {(!category.collaborator_role || category.collaborator_role === 'editor') && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!category.collaborator_role && !isTeam) {
+                                openProModal('folder');
+                                return;
+                              }
+                              setAddSubcatParentId(addSubcatParentId === category.id ? null : category.id);
+                            }}
+                            className="p-1 rounded-apple-sm text-slate-400 hover:text-accent hover:bg-slate-50 dark:hover:bg-[#1c1c1e]/50 cursor-pointer transition-colors flex items-center gap-0.5"
+                            title="Alt Klasör Ekle"
+                          >
+                            {!category.collaborator_role && !isTeam && <Lock size={8} className="text-amber-500" />}
+                            <Plus size={11} />
+                          </button>
+                        )}
                         
-                        {/* Share Button (Root folders only) */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!isTeam) {
-                              openProModal('share');
-                              return;
-                            }
-                            onShareCategory(category);
-                          }}
-                          className="p-1 rounded-apple-sm text-slate-400 hover:text-accent hover:bg-slate-50 dark:hover:bg-[#1c1c1e]/50 cursor-pointer transition-colors flex items-center gap-0.5"
-                          title="Paylaş"
-                        >
-                          {!isTeam && <Lock size={8} className="text-amber-500" />}
-                          <Share2 size={11} />
-                        </button>
+                        {/* Share Button (Root folders only, owner only) */}
+                        {!category.collaborator_role && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!isTeam) {
+                                openProModal('share');
+                                return;
+                              }
+                              onShareCategory(category);
+                            }}
+                            className="p-1 rounded-apple-sm text-slate-400 hover:text-accent hover:bg-slate-50 dark:hover:bg-[#1c1c1e]/50 cursor-pointer transition-colors flex items-center gap-0.5"
+                            title="Paylaş"
+                          >
+                            {!isTeam && <Lock size={8} className="text-amber-500" />}
+                            <Share2 size={11} />
+                          </button>
+                        )}
                         
-                        {/* Delete Button */}
-                        <button
-                          onClick={(e) => handleDeleteCategory(category.id, e)}
-                          className="p-1 rounded-apple-sm text-slate-400 hover:text-red-500 hover:bg-slate-50 dark:hover:bg-[#1c1c1e]/50 cursor-pointer transition-colors"
-                          title="Sil"
-                        >
-                          <Trash2 size={11} />
-                        </button>
+                        {/* Delete Button (Owner only) */}
+                        {!category.collaborator_role && (
+                          <button
+                            onClick={(e) => handleDeleteCategory(category.id, e)}
+                            className="p-1 rounded-apple-sm text-slate-400 hover:text-red-500 hover:bg-slate-50 dark:hover:bg-[#1c1c1e]/50 cursor-pointer transition-colors"
+                            title="Sil"
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </button>
@@ -390,14 +396,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               {keepCounts[sub.id] || 0}
                             </span>
                             <div className="hidden group-hover:flex items-center gap-1">
-                              {/* Subfolders cannot be shared, only show delete button */}
-                              <button
-                                onClick={(e) => handleDeleteCategory(sub.id, e)}
-                                className="p-1 rounded-apple-sm text-slate-400 hover:text-red-500 hover:bg-slate-50 dark:hover:bg-[#1c1c1e]/50 cursor-pointer transition-colors"
-                                title="Sil"
-                              >
-                                <Trash2 size={10} />
-                              </button>
+                              {/* Subfolders cannot be shared, only show delete button for owner or editor */}
+                              {(!category.collaborator_role || category.collaborator_role === 'editor') && (
+                                <button
+                                  onClick={(e) => handleDeleteCategory(sub.id, e)}
+                                  className="p-1 rounded-apple-sm text-slate-400 hover:text-red-500 hover:bg-slate-50 dark:hover:bg-[#1c1c1e]/50 cursor-pointer transition-colors"
+                                  title="Sil"
+                                >
+                                  <Trash2 size={10} />
+                                </button>
+                              )}
                             </div>
                           </div>
                         </button>

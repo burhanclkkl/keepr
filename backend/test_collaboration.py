@@ -6,7 +6,7 @@ import json
 import sys
 from datetime import datetime, timedelta
 
-sys.path.insert(0, '/Users/burhan/Desktop/keepr/backend')
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from app import create_app
 from app.database import db
 from app.models.user import User
@@ -81,14 +81,14 @@ class TestCollaborationInfrastructure(unittest.TestCase):
         team_cat_id = team_cat['id']
         
         # Step 2: Attempt invitation from Free user (gating check)
-        resp = self.client.post('/api/collaborations/invite', headers=headers_free, json={
+        resp = self.client.post('/api/invite', headers=headers_free, json={
             'category_id': team_cat_id,
             'role': 'editor'
         })
         self.assertEqual(resp.status_code, 403) # TEAM_REQUIRED
         
         # Step 3: Create invitation from Team user
-        resp = self.client.post('/api/collaborations/invite', headers=headers_team, json={
+        resp = self.client.post('/api/invite', headers=headers_team, json={
             'category_id': team_cat_id,
             'role': 'editor'
         })
@@ -98,18 +98,18 @@ class TestCollaborationInfrastructure(unittest.TestCase):
         self.assertEqual(invite_data['role'], 'editor')
         
         # Step 4: Access public invitation details
-        resp = self.client.get(f'/api/collaborations/invite/{invite_token}')
+        resp = self.client.get(f'/api/invite/{invite_token}')
         self.assertEqual(resp.status_code, 200)
         details = json.loads(resp.data.decode('utf-8'))
         self.assertEqual(details['category_name'], 'Team Work')
         self.assertEqual(details['inviter_username'], 'team_user')
         
         # Step 5: Accept invitation from Collab User
-        resp = self.client.post(f'/api/collaborations/invite/{invite_token}/accept', headers=headers_collab)
+        resp = self.client.post(f'/api/invite/{invite_token}/accept', headers=headers_collab)
         self.assertEqual(resp.status_code, 200)
         
         # Step 6: Verify Collab User is listed as collaborator
-        resp = self.client.get(f'/api/collaborations/collaborators/category/{team_cat_id}', headers=headers_team)
+        resp = self.client.get(f'/api/collaborators/category/{team_cat_id}', headers=headers_team)
         self.assertEqual(resp.status_code, 200)
         collaborators = json.loads(resp.data.decode('utf-8'))
         self.assertEqual(len(collaborators), 1)

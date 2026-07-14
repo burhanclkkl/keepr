@@ -23,6 +23,12 @@ def get_keeps(current_user):
     shared_category_ids = [c.category_id for c in shared_collabs]
     
     if shared_category_ids:
+        # Also find subcategory IDs of these shared categories
+        subcategories = db.session.execute(
+            db.select(Category.id).filter(Category.parent_id.in_(shared_category_ids))
+        ).scalars().all()
+        shared_category_ids.extend(subcategories)
+        
         query = db.select(Keep).filter(
             or_(
                 Keep.user_id == current_user.id,
@@ -90,7 +96,8 @@ def create_keep(current_user):
             
         is_owner = (category.user_id == current_user.id)
         from app.models.category_collaborator import CategoryCollaborator
-        collab = CategoryCollaborator.query.filter_by(category_id=category_id, user_id=current_user.id).first()
+        collab_category_id = category.parent_id if category.parent_id is not None else category_id
+        collab = CategoryCollaborator.query.filter_by(category_id=collab_category_id, user_id=current_user.id).first()
         is_editor = (collab is not None and collab.role == 'editor')
         
         if not is_owner and not is_editor:
@@ -143,8 +150,11 @@ def update_keep(current_user, keep_id):
     collab = None
     if keep.category_id:
         from app.models.category_collaborator import CategoryCollaborator
-        collab = CategoryCollaborator.query.filter_by(category_id=keep.category_id, user_id=current_user.id).first()
-        is_editor = (collab is not None and collab.role == 'editor')
+        category = db.session.get(Category, keep.category_id)
+        if category:
+            collab_category_id = category.parent_id if category.parent_id is not None else keep.category_id
+            collab = CategoryCollaborator.query.filter_by(category_id=collab_category_id, user_id=current_user.id).first()
+            is_editor = (collab is not None and collab.role == 'editor')
         
     if not is_owner and not is_editor:
         if collab and collab.role == 'viewer':
@@ -166,7 +176,8 @@ def update_keep(current_user, keep_id):
                 
             is_target_owner = (category.user_id == current_user.id)
             from app.models.category_collaborator import CategoryCollaborator
-            target_collab = CategoryCollaborator.query.filter_by(category_id=cat_id, user_id=current_user.id).first()
+            collab_category_id = category.parent_id if category.parent_id is not None else cat_id
+            target_collab = CategoryCollaborator.query.filter_by(category_id=collab_category_id, user_id=current_user.id).first()
             is_target_editor = (target_collab is not None and target_collab.role == 'editor')
             
             if not is_target_owner and not is_target_editor:
@@ -228,8 +239,11 @@ def delete_keep(current_user, keep_id):
     collab = None
     if keep.category_id:
         from app.models.category_collaborator import CategoryCollaborator
-        collab = CategoryCollaborator.query.filter_by(category_id=keep.category_id, user_id=current_user.id).first()
-        is_editor = (collab is not None and collab.role == 'editor')
+        category = db.session.get(Category, keep.category_id)
+        if category:
+            collab_category_id = category.parent_id if category.parent_id is not None else keep.category_id
+            collab = CategoryCollaborator.query.filter_by(category_id=collab_category_id, user_id=current_user.id).first()
+            is_editor = (collab is not None and collab.role == 'editor')
         
     if not is_owner and not is_editor:
         if collab and collab.role == 'viewer':

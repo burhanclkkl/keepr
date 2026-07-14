@@ -2,7 +2,7 @@ import os
 os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
 
 import sys
-sys.path.insert(0, '/Users/burhan/Desktop/keepr/backend')
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from app import create_app
 from app.database import db
 from app.models.user import User

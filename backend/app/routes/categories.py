@@ -6,6 +6,26 @@ from app.utils.auth_helpers import token_required
 
 categories_bp = Blueprint('categories', __name__)
 
+def check_category_editor_permission(category, user_id):
+    # If the user is the owner of the category
+    if category.user_id == user_id:
+        return True
+        
+    # If the category is a subfolder, check permission on the parent
+    if category.parent_id is not None:
+        parent = db.session.get(Category, category.parent_id)
+        if parent:
+            return check_category_editor_permission(parent, user_id)
+        return False
+        
+    # If the category is a root folder, check collaborator role
+    from app.models.category_collaborator import CategoryCollaborator
+    collab = CategoryCollaborator.query.filter_by(category_id=category.id, user_id=user_id).first()
+    if collab and collab.role == 'editor':
+        return True
+        
+    return False
+
 @categories_bp.route('', methods=['GET'])
 @token_required
 def get_categories(current_user):
@@ -19,19 +39,42 @@ def get_categories(current_user):
     from app.models.category_collaborator import CategoryCollaborator
     collaborations = CategoryCollaborator.query.filter_by(user_id=current_user.id).all()
     
+    shared_category_ids = [collab.category_id for collab in collaborations if collab.category_rel]
+    collab_role_map = {collab.category_id: collab.role for collab in collaborations if collab.category_rel}
+    
+    # Also find subcategories of shared categories
+    shared_subcategories = []
+    if shared_category_ids:
+        shared_subcategories = db.session.execute(
+            db.select(Category).filter(Category.parent_id.in_(shared_category_ids)).order_by(Category.created_at.asc())
+        ).scalars().all()
+    
+    added_ids = set()
     result = []
+    
     # Add owned categories
     for cat in owned_categories:
-        d = cat.to_dict()
-        d['collaborator_role'] = None
-        result.append(d)
+        if cat.id not in added_ids:
+            d = cat.to_dict()
+            d['collaborator_role'] = None
+            result.append(d)
+            added_ids.add(cat.id)
         
     # Add shared categories
     for collab in collaborations:
-        if collab.category_rel:
+        if collab.category_rel and collab.category_rel.id not in added_ids:
             d = collab.category_rel.to_dict()
             d['collaborator_role'] = collab.role
             result.append(d)
+            added_ids.add(collab.category_rel.id)
+            
+    # Add subcategories of shared categories
+    for sub in shared_subcategories:
+        if sub.id not in added_ids:
+            d = sub.to_dict()
+            d['collaborator_role'] = collab_role_map.get(sub.parent_id)
+            result.append(d)
+            added_ids.add(sub.id)
             
     return jsonify(result), 200
 
@@ -54,12 +97,18 @@ def create_category(current_user):
             return jsonify({'error': 'Geçersiz üst kategori ID değeri.'}), 400
             
         parent = db.session.get(Category, parent_id)
-        if not parent or parent.user_id != current_user.id:
-            return jsonify({'error': 'Üst kategori bulunamadı veya bu işlem için yetkiniz yok.'}), 404
+        if not parent:
+            return jsonify({'error': 'Üst kategori bulunamadı.'}), 404
             
-        # Gating: Team required to create subfolders
+        # Check permissions on the parent category: must be owner or editor
+        if not check_category_editor_permission(parent, current_user.id):
+            return jsonify({'error': 'Üst kategori bulunamadı veya bu işlem için yetkiniz yok.'}), 403
+            
+        # Gating: Team required to create subfolders (check the owner of the parent category)
         from app.utils.auth_helpers import check_tier_access
-        if not check_tier_access(current_user, min_tier='team'):
+        from app.models.user import User
+        owner = db.session.get(User, parent.user_id)
+        if not owner or not check_tier_access(owner, min_tier='team'):
             return jsonify({
                 'code': 'TEAM_REQUIRED',
                 'feature': 'subfolders',
@@ -71,7 +120,8 @@ def create_category(current_user):
             return jsonify({'error': 'Maksimum klasör derinlik sınırına (2 seviye) ulaşıldı. Bir alt klasörün altına başka bir klasör eklenemez.'}), 400
 
     try:
-        category = Category(name=name, icon=icon, user_id=current_user.id, parent_id=parent_id)
+        created_user_id = parent.user_id if parent_id is not None else current_user.id
+        category = Category(name=name, icon=icon, user_id=created_user_id, parent_id=parent_id)
         db.session.add(category)
         db.session.commit()
         return jsonify(category.to_dict()), 201
@@ -84,8 +134,21 @@ def create_category(current_user):
 def update_category(current_user, category_id):
     """Update a category's name, icon, or parent_id."""
     category = db.session.get(Category, category_id)
-    if not category or category.user_id != current_user.id:
-        return jsonify({'error': 'Kategori bulunamadı veya bu işlem için yetkiniz yok.'}), 404
+    if not category:
+        return jsonify({'error': 'Kategori bulunamadı.'}), 404
+        
+    # Permission gating:
+    # - If it's a subcategory (parent_id is not None), check if they are owner or editor of the parent
+    # - If it's a root category, only the owner is allowed to edit it
+    is_owner = (category.user_id == current_user.id)
+    is_subfolder = (category.parent_id is not None)
+    
+    if is_subfolder:
+        if not check_category_editor_permission(category, current_user.id):
+            return jsonify({'error': 'Kategori bulunamadı veya bu işlem için yetkiniz yok.'}), 403
+    else:
+        if not is_owner:
+            return jsonify({'error': 'Kategori bulunamadı veya bu işlem için yetkiniz yok.'}), 403
         
     data = request.get_json() or {}
     name = data.get('name')
@@ -108,11 +171,16 @@ def update_category(current_user, category_id):
                 return jsonify({'error': 'Bir kategori kendisinin alt klasörü olamaz.'}), 400
                 
             parent = db.session.get(Category, parent_id)
-            if not parent or parent.user_id != current_user.id:
+            if not parent:
                 return jsonify({'error': 'Üst kategori bulunamadı.'}), 404
                 
+            if not check_category_editor_permission(parent, current_user.id):
+                return jsonify({'error': 'Üst kategori bulunamadı veya bu işlem için yetkiniz yok.'}), 403
+                
             from app.utils.auth_helpers import check_tier_access
-            if not check_tier_access(current_user, min_tier='team'):
+            from app.models.user import User
+            owner = db.session.get(User, parent.user_id)
+            if not owner or not check_tier_access(owner, min_tier='team'):
                 return jsonify({
                     'code': 'TEAM_REQUIRED',
                     'feature': 'subfolders',
@@ -138,8 +206,21 @@ def update_category(current_user, category_id):
 def delete_category(current_user, category_id):
     """Delete a category. Keeps belonging to this category will have their category_id set to NULL."""
     category = db.session.get(Category, category_id)
-    if not category or category.user_id != current_user.id:
-        return jsonify({'error': 'Kategori bulunamadı veya bu işlem için yetkiniz yok.'}), 404
+    if not category:
+        return jsonify({'error': 'Kategori bulunamadı.'}), 404
+        
+    # Permission gating:
+    # - If it's a subcategory (parent_id is not None), check if they are owner or editor of the parent
+    # - If it's a root category, only the owner is allowed to delete it
+    is_owner = (category.user_id == current_user.id)
+    is_subfolder = (category.parent_id is not None)
+    
+    if is_subfolder:
+        if not check_category_editor_permission(category, current_user.id):
+            return jsonify({'error': 'Kategori bulunamadı veya bu işlem için yetkiniz yok.'}), 403
+    else:
+        if not is_owner:
+            return jsonify({'error': 'Kategori bulunamadı veya bu işlem için yetkiniz yok.'}), 403
         
     try:
         db.session.delete(category)

@@ -4,7 +4,7 @@ import json
 import os
 os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
 
-sys.path.insert(0, '/Users/burhan/Desktop/keepr/backend')
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from app import create_app
 from app.database import db
 from app.models.user import User
@@ -156,6 +156,94 @@ class TestSubfoldersHierarchy(unittest.TestCase):
         self.assertEqual(public_data['subcategories'][0]['name'], 'Python')
         self.assertEqual(len(public_data['subcategories'][0]['keeps']), 1)
         self.assertEqual(public_data['subcategories'][0]['keeps'][0]['title'], 'Django Web')
+
+    def test_role_based_subfolder_permissions(self):
+        from app.models.category_collaborator import CategoryCollaborator
+        from app.models.invitation import Invitation
+        
+        # Create editor and viewer users
+        with self.app.app_context():
+            # Clean up first to avoid duplicates
+            User.query.filter(User.username.in_(['editor_user', 'viewer_user'])).delete(synchronize_session=False)
+            db.session.commit()
+            
+            editor_user = User(
+                username='editor_user',
+                email='editor@keepr.com',
+                password_hash='dummy_hash',
+                is_pro=False,
+                subscription_type='free',
+                is_verified=True
+            )
+            viewer_user = User(
+                username='viewer_user',
+                email='viewer@keepr.com',
+                password_hash='dummy_hash',
+                is_pro=False,
+                subscription_type='free',
+                is_verified=True
+            )
+            db.session.add_all([editor_user, viewer_user])
+            db.session.commit()
+            
+            editor_user_id = editor_user.id
+            viewer_user_id = viewer_user.id
+            
+            # Create a root category owned by Team User
+            root_cat = Category(name='Root Shared', icon='folder', user_id=self.team_user_id)
+            db.session.add(root_cat)
+            db.session.commit()
+            root_cat_id = root_cat.id
+            
+            # Make editor_user an editor
+            collab_editor = CategoryCollaborator(category_id=root_cat_id, user_id=editor_user_id, role='editor')
+            # Make viewer_user a viewer
+            collab_viewer = CategoryCollaborator(category_id=root_cat_id, user_id=viewer_user_id, role='viewer')
+            db.session.add_all([collab_editor, collab_viewer])
+            db.session.commit()
+            
+        headers_editor = self.get_token_headers(editor_user_id)
+        headers_viewer = self.get_token_headers(viewer_user_id)
+        
+        # 1. Editor creates a subfolder -> Should succeed (201)
+        res = self.client.post('/api/categories', headers=headers_editor, json={
+            'name': 'Editor Sub',
+            'parent_id': root_cat_id
+        })
+        self.assertEqual(res.status_code, 201)
+        sub_cat_id = json.loads(res.data)['id']
+        
+        # 2. Viewer attempts to create a subfolder -> Should fail (403)
+        res = self.client.post('/api/categories', headers=headers_viewer, json={
+            'name': 'Viewer Sub',
+            'parent_id': root_cat_id
+        })
+        self.assertEqual(res.status_code, 403)
+        
+        # 3. Viewer attempts to rename the subfolder -> Should fail (403)
+        res = self.client.put(f'/api/categories/{sub_cat_id}', headers=headers_viewer, json={
+            'name': 'Renamed by Viewer'
+        })
+        self.assertEqual(res.status_code, 403)
+        
+        # 4. Editor renames the subfolder -> Should succeed (200)
+        res = self.client.put(f'/api/categories/{sub_cat_id}', headers=headers_editor, json={
+            'name': 'Renamed by Editor'
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(json.loads(res.data)['name'], 'Renamed by Editor')
+        
+        # 5. Viewer attempts to delete the subfolder -> Should fail (403)
+        res = self.client.delete(f'/api/categories/{sub_cat_id}', headers=headers_viewer)
+        self.assertEqual(res.status_code, 403)
+        
+        # 6. Editor deletes the subfolder -> Should succeed (200)
+        res = self.client.delete(f'/api/categories/{sub_cat_id}', headers=headers_editor)
+        self.assertEqual(res.status_code, 200)
+        
+        # 7. Editor attempts to delete the root category -> Should fail (403)
+        res = self.client.delete(f'/api/categories/{root_cat_id}', headers=headers_editor)
+        self.assertEqual(res.status_code, 403)
 
 if __name__ == '__main__':
     unittest.main()

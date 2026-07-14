@@ -1,0 +1,48 @@
+# ── Secrets & environment ─────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ── Python / Backend ──────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+instance/
+*.sqlite
+*.sqlite3
+*.db
+
+# ── Node / Frontend ───────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+build/
+.vite/
+*.local
+
+# ── Mobile / Expo ─────────────────────────────────────
+mobile/.expo/
+mobile/node_modules/
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+
+# ── Editor / OS ───────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+
+# ── Claude / AI araçları ──────────────────────────────
+.claude/
+.claude/settings.local.json
+CLAUDE.local.md
+.cursor/
+.aider*

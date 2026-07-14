@@ -44,6 +44,10 @@ def start_reminder_scheduler(flask_app):
 if __name__ == '__main__':
     # Start background reminder scheduler thread
     start_reminder_scheduler(app)
-    
+
     port = int(os.environ.get('PORT', 5055))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    # debug modu YALNIZCA geliştirmede — üretimde Werkzeug debugger'ı RCE riskidir.
+    is_prod = os.environ.get('FLASK_ENV', 'development').lower() == 'production'
+    # Üretimde bu dosya doğrudan çalıştırılmamalı; gunicorn/uwsgi arkasında koşun.
+    host = '127.0.0.1' if is_prod else '0.0.0.0'
+    app.run(host=host, port=port, debug=not is_prod)

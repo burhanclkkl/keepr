@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { API_URL } from '../../config/api';
+import { setPageMeta } from '../../utils/seo';
 import { Search, Clock, ExternalLink, Sparkles, FolderOpen, AlertTriangle, Moon, Sun, ChevronDown, ChevronRight } from 'lucide-react';
 import appLogo from '../../assets/logo.png';
 
@@ -61,9 +62,13 @@ export const SharedCollectionView: React.FC<SharedCollectionViewProps> = ({ slug
         setCategory(response.data.category);
         setKeeps(response.data.keeps);
         setSubcategories(response.data.subcategories || []);
-        // SEO: Set dynamic page title
+        // SEO: paylaşılan koleksiyon için dinamik başlık + meta güncelle
         if (response.data.category?.name) {
-          document.title = `${response.data.category.name} - Keepr Paylaşılan Koleksiyon`;
+          setPageMeta({
+            title: `${response.data.category.name} — Keepr Paylaşılan Koleksiyon`,
+            description: `${response.data.category.username || 'Bir Keepr kullanıcısı'} tarafından paylaşılan "${response.data.category.name}" koleksiyonu. Seçilmiş bağlantıları keşfedin.`,
+            canonical: `${window.location.origin}/shared/${slug}`,
+          });
         }
       } catch (err: any) {
         setError(err.response?.data?.error || 'Koleksiyon yüklenirken bir hata oluştu.');

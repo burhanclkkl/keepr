@@ -1,0 +1,10 @@
+# Keepr — robots.txt
+# NOT: keepr.app yerine gerçek üretim alan adınızı yazın.
+
+User-agent: *
+Allow: /$
+Allow: /shared/
+# Davet linkleri gizli token içerir — indekslenmemeli.
+Disallow: /invite/
+
+Sitemap: https://keepr.app/sitemap.xml

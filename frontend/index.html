@@ -7,17 +7,39 @@
     <meta name="theme-color" content="#ffffff" />
     <title>Keepr — Akıllı Dijital Kitaplık & Bağlantı Havuzu</title>
     <meta name="description" content="200 sekme mi açık? Keepr, 'bunu sonra okuyorum' diyerek kapattığınız ve unuttuğunuz tüm bağlantıları, makaleleri ve web sayfalarını düzenli klasörlerde toplar." />
-    <!-- Open Graph (OG) / Facebook -->
+    <meta name="robots" content="index, follow" />
+    <!-- Open Graph (OG) / Facebook — mutlak URL'ler ve gerçek görsel (SVG değil) -->
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Keepr" />
+    <meta property="og:locale" content="tr_TR" />
+    <meta property="og:url" content="https://keepr.app/" />
     <meta property="og:title" content="Keepr — Akıllı Dijital Kitaplık & Bağlantı Havuzu" />
     <meta property="og:description" content="Sekmelerinizde kaybolmayın. Linklerinizi kaydetmek, kategorilemek ve sabitlemek için en minimalist dijital kütüphane." />
-    <meta property="og:image" content="/favicon.svg" />
+    <meta property="og:image" content="https://keepr.app/og-image.png" />
+    <meta property="og:image:alt" content="Keepr — dijital bağlantı kitaplığı" />
     <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:title" content="Keepr — Akıllı Dijital Kitaplık & Bağlantı Havuzu" />
-    <meta property="twitter:description" content="Sekmelerinizde kaybolmayın. Linklerinizi kaydetmek, kategorilemek ve sabitlemek için en minimalist dijital kütüphane." />
-    <meta property="twitter:image" content="/favicon.svg" />
-    <link rel="canonical" href="https://keepr.co" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Keepr — Akıllı Dijital Kitaplık & Bağlantı Havuzu" />
+    <meta name="twitter:description" content="Sekmelerinizde kaybolmayın. Linklerinizi kaydetmek, kategorilemek ve sabitlemek için en minimalist dijital kütüphane." />
+    <meta name="twitter:image" content="https://keepr.app/og-image.png" />
+    <link rel="canonical" href="https://keepr.app/" />
+    <!-- Yapısal veri (JSON-LD): arama motorlarına uygulama bilgisi -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Keepr",
+      "url": "https://keepr.app/",
+      "applicationCategory": "ProductivityApplication",
+      "operatingSystem": "Web, iOS, Android",
+      "description": "Kaybolan bağlantılarınızı, makalelerinizi ve web sayfalarınızı düzenli klasörlerde toplayan minimalist dijital kitaplık.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "TRY"
+      }
+    }
+    </script>
     <!-- Inline theme init: runs synchronously before React to prevent FOUC -->
     <script>
       (function () {

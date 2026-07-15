@@ -449,3 +449,28 @@ def send_reminder_email_async(email, keep_title, keep_url):
     thread = threading.Thread(target=_send_reminder_email_task, args=(email, keep_title, keep_url))
     thread.daemon = True
     thread.start()
+
+def check_smtp_status():
+    """Diagnoses connection to SMTP server to report backend health status."""
+    mail_server = os.environ.get('MAIL_SERVER')
+    mail_port = os.environ.get('MAIL_PORT')
+    mail_username = os.environ.get('MAIL_USERNAME')
+    mail_password = os.environ.get('MAIL_PASSWORD')
+    
+    if not mail_server or not mail_port or not mail_username or not mail_password:
+        return {
+            'status': 'configured_fallback',
+            'details': 'SMTP credentials missing, using terminal fallback logs for development.'
+        }
+    
+    try:
+        port = int(mail_port)
+        server = smtplib.SMTP(mail_server, port, timeout=3)
+        server.ehlo()
+        if os.environ.get('MAIL_USE_TLS', 'True').lower() == 'true':
+            server.starttls()
+            server.ehlo()
+        server.quit()
+        return {'status': 'connected', 'details': 'Successfully connected to SMTP server.'}
+    except Exception as e:
+        return {'status': 'error', 'details': str(e)}

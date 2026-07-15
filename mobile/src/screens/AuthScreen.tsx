@@ -6,7 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   useColorScheme,
@@ -16,16 +15,19 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
-import { Lock, User, Bookmark, X } from 'lucide-react-native';
+import { Lock, User, Bookmark, X, Check } from 'lucide-react-native';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { useTheme } from '../context/ThemeContext';
 import { Typography, Radius } from '../theme';
 import { VerificationScreen } from './VerificationScreen';
+import { ForgotPasswordScreen } from './ForgotPasswordScreen';
 
 export const AuthScreen: React.FC = () => {
   const { login } = useAuth();
   const { colors, themeMode } = useTheme();
+  const { showToast } = useToast();
   const isDark = themeMode === 'dark';
 
   const [isLogin, setIsLogin] = useState(true);
@@ -36,7 +38,7 @@ export const AuthScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Verification and KVKK state variables
-  const [viewMode, setViewMode] = useState<'form' | 'verify'>('form');
+  const [viewMode, setViewMode] = useState<'form' | 'verify' | 'forgot'>('form');
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState('');
   const [kvkkAccepted, setKvkkAccepted] = useState(false);
   const [kvkkModalOpen, setKvkkModalOpen] = useState(false);
@@ -44,20 +46,20 @@ export const AuthScreen: React.FC = () => {
   const handleAuth = async () => {
     // Validate fields
     if (isLogin && (!email.trim() || !password.trim())) {
-      Alert.alert('Hata', 'Lütfen tüm alanları doldurun.');
+      showToast('Lütfen tüm alanları doldurun.', 'error');
       return;
     }
     if (!isLogin && (!username.trim() || !fullName.trim() || !email.trim() || !password.trim())) {
-      Alert.alert('Hata', 'Lütfen tüm alanları doldurun.');
+      showToast('Lütfen tüm alanları doldurun.', 'error');
       return;
     }
     if (!isLogin && !kvkkAccepted) {
-      Alert.alert('Uyarı', 'Kayıt olmak için KVKK Aydınlatma Metni\'ni onaylamanız gerekmektedir.');
+      showToast('Kayıt olmak için KVKK Aydınlatma Metni\'ni onaylamanız gerekmektedir.', 'error');
       return;
     }
 
     if (password.length < 12) {
-      Alert.alert('Hata', 'Şifre en az 12 karakter olmalıdır.');
+      showToast('Şifre en az 12 karakter olmalıdır.', 'error');
       return;
     }
 
@@ -79,7 +81,7 @@ export const AuthScreen: React.FC = () => {
       if (response.data && response.data.verification_pending) {
         setPendingVerificationEmail(email.trim());
         setViewMode('verify');
-        Alert.alert('Doğrulama Gerekli', response.data.message || 'Lütfen e-postanıza gönderilen 6 haneli doğrulama kodunu girin.');
+        showToast(response.data.message || 'Lütfen e-postanıza gönderilen doğrulama kodunu girin.', 'info');
       } else if (response.data && response.data.token && response.data.refresh_token && response.data.user) {
         if (!isLogin) {
           // Set onboarding pending flag for new registrations
@@ -93,13 +95,14 @@ export const AuthScreen: React.FC = () => {
       console.error(err);
       const isVerificationPending = err.response?.data?.verification_pending;
       if (isVerificationPending) {
+        setIsLoading(false);
         setPendingVerificationEmail(email.trim());
         setViewMode('verify');
-        Alert.alert('Doğrulama Gerekli', err.response.data.error);
+        showToast(err.response.data.error, 'info');
         return;
       }
       const errMsg = err.response?.data?.error || 'Bir hata oluştu, lütfen tekrar deneyin.';
-      Alert.alert('İşlem Başarısız', errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -109,6 +112,15 @@ export const AuthScreen: React.FC = () => {
     return (
       <VerificationScreen
         email={pendingVerificationEmail}
+        onBack={() => setViewMode('form')}
+      />
+    );
+  }
+
+  if (viewMode === 'forgot') {
+    return (
+      <ForgotPasswordScreen
+        initialEmail={email}
         onBack={() => setViewMode('form')}
       />
     );
@@ -198,6 +210,18 @@ export const AuthScreen: React.FC = () => {
               />
             </View>
 
+            {isLogin && (
+              <TouchableOpacity
+                onPress={() => setViewMode('forgot')}
+                style={{ alignSelf: 'flex-end', marginTop: 8 }}
+                activeOpacity={0.6}
+              >
+                <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700' }}>
+                  Şifremi Unuttum
+                </Text>
+              </TouchableOpacity>
+            )}
+
             {/* KVKK Checkbox (Only visible during signup) */}
             {!isLogin && (
               <View style={styles.kvkkRow}>
@@ -205,14 +229,14 @@ export const AuthScreen: React.FC = () => {
                   style={[
                     styles.checkbox,
                     {
-                      borderColor: colors.border,
+                      borderColor: kvkkAccepted ? colors.primary : colors.border,
                       backgroundColor: kvkkAccepted ? colors.primary : 'transparent',
                     },
                   ]}
                   onPress={() => setKvkkAccepted(!kvkkAccepted)}
                   activeOpacity={0.7}
                 >
-                  {kvkkAccepted && <View style={styles.checkboxInner} />}
+                  {kvkkAccepted && <Check size={12} color="#fff" strokeWidth={3} />}
                 </TouchableOpacity>
                 <Text style={[styles.kvkkLabel, { color: colors.textMuted }]}>
                   <Text

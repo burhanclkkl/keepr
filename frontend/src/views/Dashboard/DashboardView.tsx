@@ -989,7 +989,7 @@ export const DashboardView: React.FC = () => {
                         onChange={async (e) => {
                           const nextVal = e.target.checked;
                           if (nextVal && user?.subscription_type !== 'team') {
-                            openProModal('folder');
+                            openProModal('share');
                             return;
                           }
                           try {

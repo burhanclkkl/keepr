@@ -126,7 +126,7 @@ export const KeepCard = React.memo<KeepCardProps>(({
             {/* TITLE & LINK TEXT */}
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="font-bold text-xs text-slate-800 dark:text-slate-200 truncate max-w-sm">
+                <span className="font-bold text-xs text-slate-800 dark:text-slate-200 line-clamp-2 break-words max-w-sm">
                   {keep.title || domain}
                 </span>
                 {/* Pin icon next to title if true */}
@@ -332,7 +332,7 @@ export const KeepCard = React.memo<KeepCardProps>(({
         {/* DETAILS SECTION */}
         <div className="flex-1 min-w-0 flex flex-col justify-center py-0.5">
           <div className="flex items-center gap-1 flex-wrap">
-            <h3 className="font-bold text-xs text-slate-800 dark:text-slate-200 truncate leading-tight max-w-[140px]">
+            <h3 className="font-bold text-xs text-slate-800 dark:text-slate-200 line-clamp-2 break-words leading-tight max-w-[140px]">
               {keep.title || domain}
             </h3>
             {/* Inline status badges — no overlap with action bar */}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Eye, EyeOff, Loader2, User, Key, Palette, UserX, AlertTriangle, ShieldAlert, LogOut, Crown, Sparkles, Users, Link } from 'lucide-react';
+import { X, Check, Eye, EyeOff, Loader2, User, Key, Palette, UserX, AlertTriangle, ShieldAlert, LogOut, Crown, Sparkles, Users, Link, LayoutGrid, List } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme, THEME_COLORS } from '../../context/ThemeContext';
 import type { ThemeMode, ThemeColor } from '../../context/ThemeContext';
@@ -178,13 +178,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       const response = await api.put('/api/auth/me', payload);
 
       if (response.data) {
-        // Update user state globally to sync changes
-        setUser(response.data.user);
-        
         // Apply theme locally only if pro and something changed
         if (isPro && (selectedMode !== themeMode || selectedColor !== themeColor)) {
           await updateTheme(selectedMode, selectedColor);
         }
+
+        if (newPassword) {
+          showToast('Şifreniz güncellendi. Güvenliğiniz için lütfen yeni şifrenizle tekrar giriş yapın.', 'info');
+          logout();
+          setNewPassword('');
+          setConfirmPassword('');
+          setCurrentPassword('');
+          onClose();
+          return;
+        }
+
+        // Update user state globally to sync changes
+        setUser(response.data.user);
+        
         showToast('Ayarlar başarıyla kaydedildi.');
         
         setNewPassword('');
@@ -265,10 +276,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       <div className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal Container — matches mobile sheet proportions */}
-      <div className="relative w-full max-w-lg bg-white dark:bg-[#121212] border border-gray-100 dark:border-[#1c1c1e] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh] animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-[540px] bg-white dark:bg-[#121212] border border-gray-100 dark:border-[#1c1c1e] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh] animate-in fade-in zoom-in-95 duration-200">
 
         {/* Header */}
-        <div className="px-5 pt-5 pb-4 flex justify-between items-start flex-shrink-0">
+        <div className="px-6 pt-6 pb-4 flex justify-between items-start flex-shrink-0">
           <div>
             <h3 className="font-black text-[15px] text-slate-800 dark:text-slate-200 tracking-tight">Profil &amp; Ayarlar</h3>
             <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-semibold">
@@ -284,27 +295,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         </div>
 
         {/* Horizontal Tab Bar — identical look to mobile */}
-        <div className="px-5 pb-0 flex-shrink-0">
-          <div className="flex p-0.5 bg-slate-100 dark:bg-[#1c1c1e] rounded-xl border border-gray-200/20 dark:border-white/5 select-none overflow-x-auto gap-0">
+        <div className="px-6 pb-0 flex-shrink-0">
+          <div className="flex p-0.5 bg-slate-100 dark:bg-[#1c1c1e] rounded-xl border border-gray-200/20 dark:border-white/5 select-none overflow-x-auto gap-0.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {([
-              { id: 'profile',      label: 'Profil',   icon: <User      size={11} /> },
-              { id: 'password',     label: 'Şifre',    icon: <Key       size={11} /> },
-              { id: 'theme',        label: 'Tema',     icon: <Palette   size={11} /> },
-              { id: 'subscription', label: 'Üyelik',   icon: <Crown     size={11} /> },
-              { id: 'team',         label: 'Ortak',    icon: <Users     size={11} /> },
-              { id: 'account',      label: 'Hesap',    icon: <UserX     size={11} /> },
+              { id: 'profile',      label: 'Profil',   icon: <User      size={11.5} /> },
+              { id: 'password',     label: 'Şifre',    icon: <Key       size={11.5} /> },
+              { id: 'theme',        label: 'Tema',     icon: <Palette   size={11.5} /> },
+              { id: 'subscription', label: 'Üyelik',   icon: <Crown     size={11.5} /> },
+              { id: 'team',         label: 'Ortak',    icon: <Users     size={11.5} /> },
+              { id: 'account',      label: 'Hesap',    icon: <UserX     size={11.5} /> },
             ] as { id: typeof activeTab; label: string; icon: React.ReactNode }[]).map((tab) => {
               const isActive = activeTab === tab.id;
               const isDanger = tab.id === 'account';
               const isTeam   = tab.id === 'team';
               const isSub    = tab.id === 'subscription';
-              const activeColor = isDanger ? 'text-red-500' : isTeam ? 'text-violet-600 dark:text-violet-400' : isSub ? 'text-amber-500' : 'text-slate-800 dark:text-slate-100';
+              const activeColor = isDanger ? 'text-red-500' : isTeam ? 'text-accent' : isSub ? 'text-accent' : 'text-slate-800 dark:text-slate-100';
               return (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center justify-center gap-1 flex-1 min-w-[52px] py-2 rounded-[10px] text-[10px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  className={`flex items-center justify-center gap-1.5 flex-1 px-3.5 py-2.5 rounded-[10px] text-[10.5px] font-bold transition-colors duration-150 cursor-pointer whitespace-nowrap ${
                     isActive
                       ? `bg-white dark:bg-[#2b2b30] shadow-sm ${activeColor}`
                       : 'text-slate-400 dark:text-slate-500 hover:text-slate-600'
@@ -319,7 +330,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 min-h-0">
+        <div className="flex-1 overflow-y-auto px-6 py-6 min-h-0">
 
           {/* ── TAB: Profile ── */}
           {activeTab === 'profile' && (
@@ -483,7 +494,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                   ] as const).map(({ val, label, sub }) => (
                     <button key={val} type="button" onClick={() => setSelectedLayout(val)}
                       className={`relative flex flex-col items-center justify-center py-4 rounded-xl border-[1.5px] gap-1 cursor-pointer transition-all ${selectedLayout === val ? 'border-accent bg-accent/5 text-accent' : 'border-gray-200 dark:border-[#2c2c2e] text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-[#1c1c1e]'}`}>
-                      {val === 'grid' ? <Sparkles size={20} /> : <Key size={20} />}
+                      {val === 'grid' ? <LayoutGrid size={20} /> : <List size={20} />}
                       <span className="text-xs font-bold">{label}</span>
                       <span className="text-[9px] font-semibold tracking-wide opacity-70">{sub}</span>
                       {selectedLayout === val && (
@@ -514,22 +525,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               {/* Current Plan Card */}
               <div className="p-4 bg-slate-50 dark:bg-[#1c1c1e] border border-gray-100 dark:border-[#2c2c2e] rounded-xl">
                 <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Mevcut Paketiniz</span>
-                <div className="flex items-center gap-2.5 mt-2">
-                  {user?.subscription_type === 'team' && <Crown size={20} color="#8b5cf6" fill="rgba(139,92,246,0.12)" />}
-                  {user?.subscription_type === 'pro'  && <Sparkles size={20} className="text-accent" />}
-                  {(!user?.subscription_type || user?.subscription_type === 'free') && <User size={20} className="text-slate-400" />}
-                  <div>
-                    <p className="text-[15px] font-black leading-none" style={{ color: user?.subscription_type === 'team' ? '#8b5cf6' : user?.subscription_type === 'pro' ? 'var(--color-accent)' : undefined }}>
-                      {user?.subscription_type === 'team' ? 'Keepr Team' : user?.subscription_type === 'pro' ? 'Keepr Pro' : 'Ücretsiz Sürüm'}
-                    </p>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                      {user?.subscription_type === 'team' ? 'Sınırsız Özellikler & Ortak Klasörler' : user?.subscription_type === 'pro' ? 'Özel Temalar, Pinler ve Akıllı Alarmlar' : 'Temel özellikler ve link saklama'}
-                    </p>
-                  </div>
-                  <div className="ml-auto">
-                    {user?.subscription_type === 'team' && <span className="px-2 py-0.5 rounded-md text-[8px] font-black tracking-wider bg-violet-500/10 text-violet-500 border border-violet-500/15 uppercase">TEAM</span>}
-                    {user?.subscription_type === 'pro'  && <span className="px-2 py-0.5 rounded-md text-[8px] font-black tracking-wider bg-accent/10 text-accent border border-accent/15 uppercase">PRO</span>}
-                    {(!user?.subscription_type || user?.subscription_type === 'free') && <span className="px-2 py-0.5 rounded-md text-[8px] font-black tracking-wider bg-slate-100 dark:bg-[#2c2c2e] text-slate-400 uppercase">FREE</span>}
+                <div className="flex flex-row items-center justify-between gap-4 mt-2">
+                  <div className="flex items-center gap-3">
+                    {user?.subscription_type === 'team' && <Crown size={22} className="text-accent" />}
+                    {user?.subscription_type === 'pro'  && <Sparkles size={22} className="text-accent" />}
+                    {(!user?.subscription_type || user?.subscription_type === 'free') && <User size={22} className="text-slate-400" />}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[14px] font-black leading-none text-slate-800 dark:text-slate-200">
+                          {user?.subscription_type === 'team' ? 'Keepr TEAM' : user?.subscription_type === 'pro' ? 'Keepr PRO' : 'Ücretsiz Sürüm'}
+                        </p>
+                        {user?.subscription_type === 'team' && <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-accent/10 text-accent border border-accent/15 uppercase">TEAM</span>}
+                        {user?.subscription_type === 'pro'  && <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-accent/10 text-accent border border-accent/15 uppercase">PRO</span>}
+                        {(!user?.subscription_type || user?.subscription_type === 'free') && <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-slate-100 dark:bg-[#2c2c2e] text-slate-400 uppercase">FREE</span>}
+                      </div>
+                      <p className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-1 font-semibold leading-relaxed">
+                        {user?.subscription_type === 'team' ? 'Keepr Team üyeliğiniz aktif. Tüm pro/ekip özelliklerine tam erişim yetkiniz bulunmaktadır.' : user?.subscription_type === 'pro' ? 'Özel Temalar, Pinler ve Akıllı Alarmlar aktif.' : 'Temel özellikler ve link saklama'}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -589,35 +602,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           {activeTab === 'team' && (
             <div className="space-y-5">
               {/* Hero */}
-              <div className="rounded-2xl overflow-hidden">
-                <div className="bg-[#6d28d9] p-5 relative">
-                  <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full bg-white/10" />
-                  <div className="absolute right-2 -bottom-6 w-12 h-12 rounded-full bg-white/5" />
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Users size={15} color="rgba(255,255,255,0.85)" />
-                      <span className="text-[9px] font-black text-white/60 uppercase tracking-[2px]">KEEPR TEAM</span>
-                    </div>
-                    <p className="text-[15px] font-black text-white mb-1 tracking-tight">Ortak Klasöre Katıl</p>
-                    <p className="text-[10.5px] text-white/65 leading-relaxed">
-                      Arkadaşlarınızın paylaştığı davet linkini yapıştırarak ortak klasöre anında erişin.
-                    </p>
+              <div className="rounded-2xl overflow-hidden bg-accent relative text-white p-5">
+                <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full bg-white/10" />
+                <div className="absolute right-2 -bottom-6 w-12 h-12 rounded-full bg-white/5" />
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Users size={15} className="text-white/80" />
+                    <span className="text-[9px] font-black text-white/70 uppercase tracking-[2px]">KEEPR TEAM</span>
                   </div>
+                  <p className="text-[15px] font-black mb-1 tracking-tight">Ortak Klasöre Katıl</p>
+                  <p className="text-[10.5px] text-white/80 leading-relaxed">
+                    Arkadaşlarınızın paylaştığı davet linkini yapıştırarak ortak klasöre anında erişin.
+                  </p>
                 </div>
               </div>
               {/* Input */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Davet Linki veya Kodu</label>
                 <div className="flex items-stretch gap-0">
-                  <div className="flex-1 flex items-center gap-2 bg-white dark:bg-[#18181a] border border-violet-200 dark:border-violet-500/30 rounded-l-xl px-3 h-11">
-                    <Link size={13} className="text-violet-400 flex-shrink-0" />
+                  <div className="flex-1 flex items-center gap-2 bg-white dark:bg-[#18181a] border border-accent/20 dark:border-accent/30 rounded-l-xl px-3 h-11">
+                    <Link size={13} className="text-accent flex-shrink-0" />
                     <input type="text" value={inviteInput} onChange={(e) => setInviteInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleJoinInvite()}
                       placeholder="keepr.app/invite/abc123 veya token..."
                       className="flex-1 bg-transparent text-[11px] text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none" />
                   </div>
                   <button type="button" onClick={handleJoinInvite} disabled={isJoiningInvite || !inviteInput.trim()}
-                    className="px-5 h-11 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-[11px] font-black rounded-r-xl transition-colors flex items-center gap-1.5 cursor-pointer flex-shrink-0 border-none">
+                    className="px-5 h-11 bg-accent hover:bg-accent/90 disabled:opacity-50 text-white text-[11px] font-black rounded-r-xl transition-colors flex items-center gap-1.5 cursor-pointer flex-shrink-0 border-none">
                     {isJoiningInvite ? <Loader2 size={12} className="animate-spin" /> : inviteJoinSuccess ? <Check size={12} strokeWidth={3} /> : null}
                     {inviteJoinSuccess ? 'Katıldı!' : 'Katıl'}
                   </button>
@@ -628,13 +639,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               </div>
               {/* Role info */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-xl bg-violet-50 dark:bg-violet-900/15 border border-violet-100 dark:border-violet-500/15">
-                  <p className="text-[10px] font-black text-violet-700 dark:text-violet-400 mb-1">👁️ İzleyici</p>
-                  <p className="text-[9px] text-violet-600 dark:text-violet-500 leading-relaxed">Bağlantıları görüntüleyebilirsiniz.</p>
+                <div className="p-3 rounded-xl bg-accent/5 dark:bg-accent/10 border border-accent/10">
+                  <p className="text-[10px] font-black text-accent mb-1">👁️ İzleyici</p>
+                  <p className="text-[9px] text-slate-500 dark:text-slate-400 leading-relaxed">Bağlantıları görüntüleyebilirsiniz.</p>
                 </div>
-                <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/15 border border-indigo-100 dark:border-indigo-500/15">
-                  <p className="text-[10px] font-black text-indigo-700 dark:text-indigo-400 mb-1">✏️ Editör</p>
-                  <p className="text-[9px] text-indigo-600 dark:text-indigo-500 leading-relaxed">Bağlantı ekleyip silebilirsiniz.</p>
+                <div className="p-3 rounded-xl bg-accent/5 dark:bg-accent/10 border border-accent/10">
+                  <p className="text-[10px] font-black text-accent mb-1">✏️ Editör</p>
+                  <p className="text-[9px] text-slate-500 dark:text-slate-400 leading-relaxed">Bağlantı ekleyip silebilirsiniz.</p>
                 </div>
               </div>
             </div>

@@ -114,13 +114,17 @@ function MainApp() {
 
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { ToastProvider } from './src/context/ToastContext';
+
 export default function App() {
   return (
     <SafeAreaProvider>
       <ShareIntentProvider>
         <AuthProvider>
           <ThemeProvider>
-            <MainApp />
+            <ToastProvider>
+              <MainApp />
+            </ToastProvider>
           </ThemeProvider>
         </AuthProvider>
       </ShareIntentProvider>

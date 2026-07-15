@@ -180,6 +180,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
         if (isPro && (selectedMode !== themeMode || selectedColor !== themeColor)) {
           await updateTheme(selectedMode, selectedColor);
         }
+
+        if (newPassword) {
+          Alert.alert('Şifre Güncellendi', 'Şifreniz başarıyla güncellendi. Güvenliğiniz için lütfen yeni şifrenizle tekrar giriş yapın.', [
+            {
+              text: 'Tamam',
+              onPress: async () => {
+                await logout();
+                setCurrentPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+                onClose();
+              }
+            }
+          ]);
+          return;
+        }
+
         // Refresh local user profile
         await refreshProfile();
 

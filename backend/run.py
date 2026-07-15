@@ -14,6 +14,7 @@ def start_reminder_scheduler(flask_app):
         while True:
             try:
                 with flask_app.app_context():
+                    flask_app.config['SCHEDULER_LAST_RUN'] = datetime.now(timezone.utc).isoformat()
                     from app.models.keep import Keep
                     from app.models.user import User
                     from app.database import db

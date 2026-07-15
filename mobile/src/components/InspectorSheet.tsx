@@ -8,15 +8,17 @@ import {
   ActivityIndicator,
   Modal,
   ScrollView,
-  Alert,
+  Animated,
+  PanResponder,
   Linking,
 } from 'react-native';
 import { Typography, Radius } from '../theme';
 import { useTheme } from '../context/ThemeContext';
-import { X, Save, Trash2, ExternalLink, Calendar, Bell, Check, Users } from 'lucide-react-native';
+import { X, Save, Trash2, ExternalLink, Calendar, Bell, Check, Users, CornerDownRight } from 'lucide-react-native';
 import { Keep } from './KeepCard';
 import { ConfirmModal } from './ConfirmModal';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import api from '../services/api';
 
 interface Category {
@@ -49,6 +51,7 @@ export const InspectorSheet: React.FC<InspectorSheetProps> = ({
 }) => {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const { showToast } = useToast();
 
   const isReadOnly = useMemo(() => {
     if (!keep) return false;
@@ -64,12 +67,12 @@ export const InspectorSheet: React.FC<InspectorSheetProps> = ({
 
   const sortedCategories = useMemo(() => {
     const rootCats = categories.filter(c => !c.parent_id);
-    const sorted: Category[] = [];
+    const sorted: (Category & { isSubfolder?: boolean; parentName?: string })[] = [];
     for (const root of rootCats) {
-      sorted.push(root);
+      sorted.push({ ...root, isSubfolder: false });
       const subCats = categories.filter(sub => sub.parent_id === root.id);
       for (const sub of subCats) {
-        sorted.push({ ...sub, name: `↳ ${sub.name}` });
+        sorted.push({ ...sub, isSubfolder: true, parentName: root.name });
       }
     }
     return sorted;
@@ -82,6 +85,45 @@ export const InspectorSheet: React.FC<InspectorSheetProps> = ({
   const [customTime, setCustomTime] = useState('');
   const [isUpdatingReminder, setIsUpdatingReminder] = useState(false);
   const [showCustomReminder, setShowCustomReminder] = useState(false);
+
+  const translateY = React.useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isOpen) {
+      translateY.setValue(0);
+    }
+  }, [isOpen]);
+
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dy) > 5;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          translateY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 120) {
+          Animated.timing(translateY, {
+            toValue: 600,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => {
+            onClose();
+          });
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 4,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   useEffect(() => {
     if (keep) {
@@ -152,13 +194,13 @@ export const InspectorSheet: React.FC<InspectorSheetProps> = ({
       const response = await api.post(`/api/keeps/${keep.id}/reminder`, {
         reminder_at: date.toISOString(),
       });
-      Alert.alert('Başarılı', 'Alarm başarıyla kuruldu.');
+      showToast('Alarm başarıyla kuruldu.', 'success');
       if (response.data.keep) {
         onRefreshKeep?.(response.data.keep);
       }
     } catch (e: any) {
       const errMsg = e.response?.data?.message || 'Alarm kurulurken hata oluştu.';
-      Alert.alert('Hata', errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setIsUpdatingReminder(false);
     }
@@ -167,7 +209,7 @@ export const InspectorSheet: React.FC<InspectorSheetProps> = ({
   const handleSetCustomReminder = async () => {
     if (!keep) return;
     if (!customDate || !customTime) {
-      Alert.alert('Hata', 'Lütfen geçerli tarih ve saat girin.');
+      showToast('Lütfen geçerli tarih ve saat girin.', 'error');
       return;
     }
 
@@ -175,15 +217,17 @@ export const InspectorSheet: React.FC<InspectorSheetProps> = ({
     const timeRegex = /^\d{2}:\d{2}$/;
 
     if (!dateRegex.test(customDate) || !timeRegex.test(customTime)) {
-      Alert.alert('Hata', 'Tarih formatı YYYY-MM-DD ve Saat formatı HH:MM olmalıdır.');
+      showToast('Tarih formatı YYYY-MM-DD ve Saat formatı HH:MM olmalıdır.', 'error');
       return;
     }
 
     setIsUpdatingReminder(true);
     try {
-      const dt = new Date(`${customDate}T${customTime}:00`);
+      const [year, month, day] = customDate.split('-').map(Number);
+      const [hour, minute] = customTime.split(':').map(Number);
+      const dt = new Date(year, month - 1, day, hour, minute, 0);
       if (isNaN(dt.getTime())) {
-        Alert.alert('Hata', 'Geçersiz tarih veya saat değeri.');
+        showToast('Geçersiz tarih veya saat değeri.', 'error');
         setIsUpdatingReminder(false);
         return;
       }
@@ -191,13 +235,13 @@ export const InspectorSheet: React.FC<InspectorSheetProps> = ({
       const response = await api.post(`/api/keeps/${keep.id}/reminder`, {
         reminder_at: dt.toISOString(),
       });
-      Alert.alert('Başarılı', 'Alarm başarıyla kuruldu.');
+      showToast('Alarm başarıyla kuruldu.', 'success');
       if (response.data.keep) {
         onRefreshKeep?.(response.data.keep);
       }
     } catch (e: any) {
       const errMsg = e.response?.data?.message || 'Alarm kurulurken hata oluştu.';
-      Alert.alert('Hata', errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setIsUpdatingReminder(false);
     }
@@ -210,7 +254,7 @@ export const InspectorSheet: React.FC<InspectorSheetProps> = ({
       const response = await api.post(`/api/keeps/${keep.id}/reminder`, {
         reminder_at: null,
       });
-      Alert.alert('Başarılı', 'Alarm kaldırıldı.');
+      showToast('Alarm kaldırıldı.', 'success');
       setCustomDate('');
       setCustomTime('');
       setShowCustomReminder(false);
@@ -218,7 +262,7 @@ export const InspectorSheet: React.FC<InspectorSheetProps> = ({
         onRefreshKeep?.(response.data.keep);
       }
     } catch (e) {
-      Alert.alert('Hata', 'Alarm kaldırılırken hata oluştu.');
+      showToast('Alarm kaldırılırken hata oluştu.', 'error');
     } finally {
       setIsUpdatingReminder(false);
     }
@@ -238,7 +282,7 @@ export const InspectorSheet: React.FC<InspectorSheetProps> = ({
       });
       onClose();
     } catch (e) {
-      Alert.alert('Hata', 'Güncelleme sırasında hata oluştu.');
+      showToast('Güncelleme sırasında hata oluştu.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -277,7 +321,11 @@ export const InspectorSheet: React.FC<InspectorSheetProps> = ({
         />
 
         {/* Bottom Sheet Card */}
-        <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Animated.View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border, transform: [{ translateY }] }]}>
+          {/* Drag Handle Area */}
+          <View style={styles.dragHandleArea} {...panResponder.panHandlers}>
+            <View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
+          </View>
           {/* Header */}
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>Detayları İncele</Text>
@@ -305,7 +353,7 @@ export const InspectorSheet: React.FC<InspectorSheetProps> = ({
                 if (supported) {
                   await Linking.openURL(url);
                 } else {
-                  Alert.alert('Hata', 'Bu bağlantı açılamıyor: ' + url);
+                  showToast('Bu bağlantı açılamıyor: ' + url, 'error');
                 }
               }}
               activeOpacity={0.7}
@@ -375,6 +423,7 @@ export const InspectorSheet: React.FC<InspectorSheetProps> = ({
                 {/* Categories */}
                 {sortedCategories.map((cat) => {
                   const isSelected = selectedCategoryId === cat.id;
+                  const isSub = cat.isSubfolder;
                   return (
                     <TouchableOpacity
                       key={cat.id}
@@ -386,19 +435,31 @@ export const InspectorSheet: React.FC<InspectorSheetProps> = ({
                           backgroundColor: isSelected ? colors.primary : colors.background,
                           opacity: isReadOnly ? 0.6 : 1,
                         },
+                        isSub && {
+                          borderWidth: 1,
+                          borderStyle: 'dashed',
+                          borderColor: isSelected ? colors.primary : colors.border,
+                          paddingHorizontal: 8,
+                        }
                       ]}
                       activeOpacity={0.7}
                     >
-                      <Text
-                        style={[
-                          styles.categoryText,
-                          {
-                            color: isSelected ? '#fff' : colors.textMuted,
-                          },
-                        ]}
-                      >
-                        {cat.name}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {isSub && (
+                          <CornerDownRight size={10} color={isSelected ? '#fff' : colors.primary} style={{ marginRight: 3 }} />
+                        )}
+                        <Text
+                          style={[
+                            styles.categoryText,
+                            {
+                              color: isSelected ? '#fff' : colors.textMuted,
+                              fontSize: isSub ? 10 : 11,
+                            },
+                          ]}
+                        >
+                          {cat.name}
+                        </Text>
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
@@ -634,7 +695,7 @@ export const InspectorSheet: React.FC<InspectorSheetProps> = ({
               )}
             </View>
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
 
       {keep && (
@@ -652,7 +713,7 @@ export const InspectorSheet: React.FC<InspectorSheetProps> = ({
               await onDelete(keep.id);
               onClose();
             } catch (e) {
-              Alert.alert('Hata', 'Silme işlemi başarısız oldu.');
+              showToast('Silme işlemi başarısız oldu.', 'error');
             } finally {
               setIsDeleting(false);
             }
@@ -680,12 +741,25 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingHorizontal: 20,
     paddingBottom: 40,
-    maxHeight: '80%',
+    maxHeight: '85%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 20,
+  },
+  dragHandleArea: {
+    width: '100%',
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -10,
+    marginBottom: 6,
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
   },
   header: {
     flexDirection: 'row',

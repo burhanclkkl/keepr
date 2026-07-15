@@ -6,7 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Image,
@@ -16,6 +15,7 @@ import { ArrowLeft } from 'lucide-react-native';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useToast } from '../context/ToastContext';
 import { Typography, Radius } from '../theme';
 import * as SecureStore from 'expo-secure-store';
 
@@ -27,6 +27,7 @@ interface VerificationScreenProps {
 export const VerificationScreen: React.FC<VerificationScreenProps> = ({ email, onBack }) => {
   const { login } = useAuth();
   const { colors, themeMode } = useTheme();
+  const { showToast } = useToast();
   
   const [code, setCode] = useState<string[]>(Array(6).fill(''));
   const [isLoading, setIsLoading] = useState(false);
@@ -44,10 +45,18 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({ email, o
     return () => clearInterval(interval);
   }, [resendTimer]);
 
-  // Handle single digit input change
   const handleChange = (value: string, index: number) => {
     // Only allow digits
     const cleaned = value.replace(/[^0-9]/g, '');
+
+    // Auto-detect and handle pasted 6-digit verification code
+    if (cleaned.length === 6) {
+      const newCode = cleaned.split('');
+      setCode(newCode);
+      inputRefs.current[5]?.focus();
+      return;
+    }
+
     const newCode = [...code];
     newCode[index] = cleaned.slice(-1);
     setCode(newCode);
@@ -100,7 +109,7 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({ email, o
       }
     } catch (err: any) {
       const errMsg = err.response?.data?.error || 'Doğrulama kodu geçersiz veya süresi dolmuş.';
-      Alert.alert('Doğrulama Başarısız', errMsg);
+      showToast(errMsg, 'error');
       setCode(Array(6).fill(''));
       inputRefs.current[0]?.focus();
     } finally {
@@ -113,17 +122,17 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({ email, o
     setIsResending(true);
     try {
       const response = await api.post('/api/auth/resend-code', { email });
-      Alert.alert('Başarılı', response.data.message || 'Yeni doğrulama kodu e-postanıza gönderildi.');
+      showToast(response.data.message || 'Yeni doğrulama kodu e-postanıza gönderildi.', 'success');
       setResendTimer(60);
       setCode(Array(6).fill(''));
       inputRefs.current[0]?.focus();
     } catch (err: any) {
       if (err.response?.status === 429) {
-        Alert.alert('Uyarı', err.response.data.error || 'Çok fazla istek. Lütfen biraz bekleyin.');
+        showToast(err.response.data.error || 'Çok fazla istek. Lütfen biraz bekleyin.', 'info');
         setResendTimer(60);
       } else {
         const errMsg = err.response?.data?.error || 'Kod gönderilemedi. Lütfen daha sonra tekrar deneyin.';
-        Alert.alert('Hata', errMsg);
+        showToast(errMsg, 'error');
       }
     } finally {
       setIsResending(false);
@@ -170,7 +179,6 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({ email, o
                     },
                   ]}
                   keyboardType="numeric"
-                  maxLength={1}
                   value={digit}
                   onChangeText={(val) => handleChange(val, idx)}
                   onKeyPress={(e) => handleKeyPress(e, idx)}

@@ -9,7 +9,7 @@ import {
   PanResponder,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Edit2, Trash2, Check, Heart, Pin, Bell, Users, Lock } from 'lucide-react-native';
+import { Edit2, Trash2, Check, Heart, Pin, Bell, Users, Lock, Folder } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { Typography, Radius } from '../theme';
 import { PremiumFeature } from './PremiumFeature';
@@ -99,19 +99,29 @@ export const KeepCard = React.memo<KeepCardProps>(({
         return !isSelectionMode && !readOnly && Math.abs(gestureState.dx) > 10;
       },
       onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dx < 0) {
-          swipeAnim.setValue(gestureState.dx);
-        }
+        swipeAnim.setValue(gestureState.dx);
       },
       onPanResponderRelease: (_, gestureState) => {
-        const threshold = viewLayout === 'list' ? -80 : -60;
-        if (gestureState.dx < threshold) {
+        const threshold = 80;
+        if (gestureState.dx < -threshold) {
           Animated.spring(swipeAnim, {
-            toValue: threshold,
+            toValue: -80,
             useNativeDriver: true,
             bounciness: 4,
           }).start(() => {
             isSwiped.current = true;
+          });
+        } else if (gestureState.dx > threshold) {
+          Animated.spring(swipeAnim, {
+            toValue: 80,
+            useNativeDriver: true,
+            bounciness: 4,
+          }).start(() => {
+            isSwiped.current = true;
+            onSelect(keep);
+            setTimeout(() => {
+              handleCancelSwipe();
+            }, 1000);
           });
         } else {
           handleCancelSwipe();
@@ -145,6 +155,11 @@ export const KeepCard = React.memo<KeepCardProps>(({
     });
   };
 
+  const handleMovePress = () => {
+    onSelect(keep);
+    handleCancelSwipe();
+  };
+
   const handlePress = () => {
     if (isSwiped.current) {
       handleCancelSwipe();
@@ -168,6 +183,17 @@ export const KeepCard = React.memo<KeepCardProps>(({
             activeOpacity={0.8}
           >
             <Trash2 size={16} color="#ef4444" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Background move tray */}
+        <View style={[styles.gridMoveTray, { backgroundColor: '#f5f3ff' }]}>
+          <TouchableOpacity
+            onPress={handleMovePress}
+            style={styles.gridMoveTrayBtn}
+            activeOpacity={0.8}
+          >
+            <Folder size={16} color="#8b5cf6" />
           </TouchableOpacity>
         </View>
 
@@ -334,6 +360,17 @@ export const KeepCard = React.memo<KeepCardProps>(({
           activeOpacity={0.8}
         >
           <Trash2 size={20} color="#ef4444" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Background move tray */}
+      <View style={[styles.moveTray, { backgroundColor: '#f5f3ff' }]}>
+        <TouchableOpacity
+          onPress={handleMovePress}
+          style={styles.moveTrayBtn}
+          activeOpacity={0.8}
+        >
+          <Folder size={20} color="#8b5cf6" />
         </TouchableOpacity>
       </View>
 
@@ -517,6 +554,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  moveTray: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: Radius.large,
+  },
+  moveTrayBtn: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   cardBody: {
     borderRadius: Radius.large,
     borderWidth: 1,
@@ -639,6 +692,22 @@ const styles = StyleSheet.create({
     borderRadius: Radius.large,
   },
   gridDeleteTrayBtn: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gridMoveTray: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: Radius.large,
+  },
+  gridMoveTrayBtn: {
     width: '100%',
     height: '100%',
     justifyContent: 'center',

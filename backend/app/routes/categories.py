@@ -104,15 +104,15 @@ def create_category(current_user):
         if not check_category_editor_permission(parent, current_user.id):
             return jsonify({'error': 'Üst kategori bulunamadı veya bu işlem için yetkiniz yok.'}), 403
             
-        # Gating: Team required to create subfolders (check the owner of the parent category)
+        # Gating: Pro/Team required to create subfolders (check the owner of the parent category)
         from app.utils.auth_helpers import check_tier_access
         from app.models.user import User
         owner = db.session.get(User, parent.user_id)
-        if not owner or not check_tier_access(owner, min_tier='team'):
+        if not owner or not check_tier_access(owner, min_tier='pro'):
             return jsonify({
-                'code': 'TEAM_REQUIRED',
+                'code': 'PRO_REQUIRED',
                 'feature': 'subfolders',
-                'message': 'Alt klasör oluşturma özelliği yalnızca Keepr Team üyelerine özeldir.'
+                'message': 'Alt klasör oluşturma özelliği yalnızca Keepr Pro ve Team üyelerine özeldir.'
             }), 403
             
         # Max Depth = 2
@@ -180,11 +180,11 @@ def update_category(current_user, category_id):
             from app.utils.auth_helpers import check_tier_access
             from app.models.user import User
             owner = db.session.get(User, parent.user_id)
-            if not owner or not check_tier_access(owner, min_tier='team'):
+            if not owner or not check_tier_access(owner, min_tier='pro'):
                 return jsonify({
-                    'code': 'TEAM_REQUIRED',
+                    'code': 'PRO_REQUIRED',
                     'feature': 'subfolders',
-                    'message': 'Alt klasör oluşturma özelliği yalnızca Keepr Team üyelerine özeldir.'
+                    'message': 'Alt klasör oluşturma özelliği yalnızca Keepr Pro ve Team üyelerine özeldir.'
                 }), 403
                 
             if parent.parent_id is not None:

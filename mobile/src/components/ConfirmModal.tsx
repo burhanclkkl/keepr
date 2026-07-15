@@ -20,6 +20,7 @@ interface ConfirmModalProps {
   onCancel: () => void;
   variant?: 'danger' | 'warning' | 'primary';
   countdownSeconds?: number;
+  singleButton?: boolean;
 }
 
 const { width } = Dimensions.get('window');
@@ -34,6 +35,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onCancel,
   variant = 'primary',
   countdownSeconds = 0,
+  singleButton = false,
 }) => {
   const { colors } = useTheme();
   const [countdown, setCountdown] = useState(countdownSeconds);
@@ -94,15 +96,19 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
           {/* Buttons Row */}
           <View style={[styles.btnRow, { borderTopColor: colors.border }]}>
-            <TouchableOpacity
-              onPress={onCancel}
-              style={[styles.btn, styles.cancelBtn]}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.cancelText, { color: colors.textMuted }]}>{cancelText}</Text>
-            </TouchableOpacity>
+            {!singleButton && (
+              <>
+                <TouchableOpacity
+                  onPress={onCancel}
+                  style={[styles.btn, styles.cancelBtn]}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.cancelText, { color: colors.textMuted }]}>{cancelText}</Text>
+                </TouchableOpacity>
 
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              </>
+            )}
 
             <TouchableOpacity
               onPress={onConfirm}

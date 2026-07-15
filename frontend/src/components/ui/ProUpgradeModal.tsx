@@ -53,7 +53,6 @@ export const ProUpgradeModal: React.FC<ProUpgradeModalProps> = ({ isOpen, onClos
       icon: <FolderTree size={15} />,
       title: 'Akıllı Alt Klasörler',
       desc: 'İç içe geçmiş alt koleksiyonlar ile kusursuz düzen.',
-      soon: true,
     },
   ];
 
@@ -161,9 +160,6 @@ export const ProUpgradeModal: React.FC<ProUpgradeModalProps> = ({ isOpen, onClos
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">{f.title}</h4>
-                        {f.soon && (
-                          <span className="text-[9px] font-black bg-slate-100 dark:bg-[#2c2c2e] text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded uppercase tracking-wide">Yakında</span>
-                        )}
                       </div>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">{f.desc}</p>
                     </div>

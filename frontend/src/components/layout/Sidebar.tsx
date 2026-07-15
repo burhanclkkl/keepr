@@ -43,6 +43,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     e.preventDefault();
     if (!newSubcatName.trim()) return;
 
+    const isPro = user?.subscription_type === 'pro' || user?.subscription_type === 'team';
+    // Alt klasör için Pro/Team gereklidir
+    if (!isPro) {
+      openProModal('folder');
+      return;
+    }
+
     try {
       await createCategoryMutation.mutateAsync({
         name: newSubcatName.trim(),
@@ -52,14 +59,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setNewSubcatName('');
       setAddSubcatParentId(null);
       setExpandedCats((prev) => ({ ...prev, [parentId]: true }));
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      const code = err?.response?.data?.code;
+      if (code === 'PRO_REQUIRED') {
+        openProModal('folder');
+      } else if (code === 'TEAM_REQUIRED') {
+        openProModal('share');
+      } else {
+        console.error(err);
+      }
     }
   };
 
   const handleCreateCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCatName.trim()) return;
+
+    const isPro = user?.subscription_type === 'pro' || user?.subscription_type === 'team';
+    if (!isPro && categories.length >= 10) {
+      openProModal('category');
+      return;
+    }
 
     try {
       await createCategoryMutation.mutateAsync({
@@ -80,7 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
-      <aside className="w-64 border-r border-gray-100 dark:border-[#1c1c1e] bg-white dark:bg-[#121212] flex flex-col h-screen select-none sticky top-0">
+      <aside className="w-[310px] border-r border-gray-100 dark:border-[#1c1c1e] bg-white dark:bg-[#121212] flex flex-col h-screen select-none sticky top-0">
         
         {/* App Logo Header */}
         <div className="p-4 flex items-center gap-2.5 border-b border-gray-100 dark:border-[#1c1c1e] w-full">
@@ -103,12 +123,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {user.username}
                 </h4>
                 {user.subscription_type === 'pro' && (
-                  <span className="inline-flex items-center px-1 py-0.5 rounded text-[8px] font-black tracking-wider bg-accent/10 text-accent border border-accent/15 uppercase flex-shrink-0">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-bold tracking-wider bg-[#34C759] text-white uppercase flex-shrink-0 ml-1">
                     PRO
                   </span>
                 )}
                 {user.subscription_type === 'team' && (
-                  <span className="inline-flex items-center px-1 py-0.5 rounded text-[8px] font-black tracking-wider bg-violet-500/10 text-violet-500 border border-violet-500/15 uppercase flex-shrink-0">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-bold tracking-wider bg-[#8B5CF6] text-white uppercase flex-shrink-0 ml-1">
                     TEAM
                   </span>
                 )}
@@ -282,29 +302,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       )}
                     </div>
                     
-                    <div className="flex items-center gap-1.5 relative h-4">
-                      <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-slate-50 dark:bg-[#1c1c1e]/50 text-slate-400 dark:text-slate-500 group-hover:hidden transition-all">
+                    <div className="flex items-center gap-1.5 relative h-4 min-w-[24px] justify-end">
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-50 dark:bg-[#1c1c1e]/50 text-slate-400 dark:text-slate-500 transition-opacity duration-150 group-hover:opacity-0">
                         {keepCounts[category.id] || 0}
                       </span>
-                      <div className="hidden group-hover:flex items-center gap-1">
-                        {/* Add Subfolder Button (Team gated for owner, allowed for editor) */}
-                        {(!category.collaborator_role || category.collaborator_role === 'editor') && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (!category.collaborator_role && !isTeam) {
-                                openProModal('folder');
-                                return;
-                              }
-                              setAddSubcatParentId(addSubcatParentId === category.id ? null : category.id);
-                            }}
-                            className="p-1 rounded-apple-sm text-slate-400 hover:text-accent hover:bg-slate-50 dark:hover:bg-[#1c1c1e]/50 cursor-pointer transition-colors flex items-center gap-0.5"
-                            title="Alt Klasör Ekle"
-                          >
-                            {!category.collaborator_role && !isTeam && <Lock size={8} className="text-amber-500" />}
-                            <Plus size={11} />
-                          </button>
-                        )}
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-150 flex items-center gap-1 bg-slate-50 dark:bg-[#1c1c1e] pl-1.5 rounded-apple-sm">
+                        {/* Add Subfolder Button (Pro/Team gated for owner, allowed for editor) */}
+                        {(!category.collaborator_role || category.collaborator_role === 'editor') && (() => {
+                          const isPro = user?.subscription_type === 'pro' || user?.subscription_type === 'team';
+                          return (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!category.collaborator_role && !isPro) {
+                                  openProModal('folder');
+                                  return;
+                                }
+                                setAddSubcatParentId(addSubcatParentId === category.id ? null : category.id);
+                              }}
+                              className="p-1 rounded-apple-sm text-slate-400 hover:text-accent hover:bg-white dark:hover:bg-slate-800 cursor-pointer transition-colors flex items-center gap-0.5"
+                              title="Alt Klasör Ekle"
+                            >
+                              {!category.collaborator_role && !isPro && <Lock size={8} className="text-amber-500" />}
+                              <Plus size={11} />
+                            </button>
+                          );
+                        })()}
                         
                         {/* Share Button (Root folders only, owner only) */}
                         {!category.collaborator_role && (
@@ -317,7 +340,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               }
                               onShareCategory(category);
                             }}
-                            className="p-1 rounded-apple-sm text-slate-400 hover:text-accent hover:bg-slate-50 dark:hover:bg-[#1c1c1e]/50 cursor-pointer transition-colors flex items-center gap-0.5"
+                            className="p-1 rounded-apple-sm text-slate-400 hover:text-accent hover:bg-white dark:hover:bg-slate-800 cursor-pointer transition-colors flex items-center gap-0.5"
                             title="Paylaş"
                           >
                             {!isTeam && <Lock size={8} className="text-amber-500" />}
@@ -329,7 +352,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         {!category.collaborator_role && (
                           <button
                             onClick={(e) => handleDeleteCategory(category.id, e)}
-                            className="p-1 rounded-apple-sm text-slate-400 hover:text-red-500 hover:bg-slate-50 dark:hover:bg-[#1c1c1e]/50 cursor-pointer transition-colors"
+                            className="p-1 rounded-apple-sm text-slate-400 hover:text-red-500 hover:bg-white dark:hover:bg-slate-800 cursor-pointer transition-colors"
                             title="Sil"
                           >
                             <Trash2 size={11} />
@@ -387,20 +410,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             <span className="truncate">{sub.name}</span>
                             {sub.collaborator_role && (
                               <span className="inline-flex items-center gap-0.5 ml-1 px-1 py-0.5 rounded text-[8px] font-black tracking-wide bg-violet-500/10 text-violet-500 border border-violet-500/10 dark:bg-violet-500/20 dark:text-violet-400">
-                                <Users size={8} /> EKİP
+                                <Users size={8} /> EKİP ({sub.collaborator_role === 'editor' ? 'EDİTÖR' : 'İZLEYİCİ'})
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1 relative h-4">
-                            <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-slate-50 dark:bg-[#1c1c1e]/50 text-slate-400 dark:text-slate-500 group-hover:hidden transition-all">
+                          <div className="flex items-center gap-1 relative h-4 min-w-[20px] justify-end">
+                            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-slate-50 dark:bg-[#1c1c1e]/50 text-slate-400 dark:text-slate-500 transition-opacity duration-150 group-hover:opacity-0">
                               {keepCounts[sub.id] || 0}
                             </span>
-                            <div className="hidden group-hover:flex items-center gap-1">
+                            <div className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-150 flex items-center gap-1 bg-slate-50 dark:bg-[#1c1c1e] pl-1.5 rounded-apple-sm">
                               {/* Subfolders cannot be shared, only show delete button for owner or editor */}
                               {(!category.collaborator_role || category.collaborator_role === 'editor') && (
                                 <button
                                   onClick={(e) => handleDeleteCategory(sub.id, e)}
-                                  className="p-1 rounded-apple-sm text-slate-400 hover:text-red-500 hover:bg-slate-50 dark:hover:bg-[#1c1c1e]/50 cursor-pointer transition-colors"
+                                  className="p-1 rounded-apple-sm text-slate-400 hover:text-red-500 hover:bg-white dark:hover:bg-slate-800 cursor-pointer transition-colors"
                                   title="Sil"
                                 >
                                   <Trash2 size={10} />

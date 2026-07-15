@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import {
   Bookmark, ArrowRight, Check, X, Zap, Search, Crown,
@@ -57,6 +57,20 @@ export const LandingView: React.FC = () => {
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
   const [hoveredCard, setHoveredCard] = useState<number | null>(null);
   const [activePricingTier, setActivePricingTier] = useState<'free' | 'pro' | 'team'>('pro');
+
+  // ROI Calculator States
+  const [dailyLinks, setDailyLinks] = useState(5);
+  const [teamSize, setTeamSize] = useState(5);
+
+  const yearlyTimeSaved = useMemo(() => {
+    // 5 mins per search * dailyLinks * 250 work days * teamSize
+    const minutes = 5 * dailyLinks * 250 * teamSize;
+    return Math.round(minutes / 60);
+  }, [dailyLinks, teamSize]);
+
+  const yearlyMoneySaved = useMemo(() => {
+    return yearlyTimeSaved * 35; // average hourly developer/professional rate
+  }, [yearlyTimeSaved]);
 
   // Interactive demo simulation
   const [searchText, setSearchText] = useState('');
@@ -260,19 +274,17 @@ export const LandingView: React.FC = () => {
             initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2, duration: 0.6 }}
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/8 dark:bg-accent/12 border border-accent/15 dark:border-accent/25 text-[10px] font-bold text-accent uppercase tracking-widest">
             <Sparkles size={10} className="fill-accent/30 animate-pulse" />
-            Yepyeni Dijital Kitaplığınız
+            Kaydettiğiniz Ama Unuttuğunuz O Linklerin Hikayesini Değiştirin
           </motion.span>
 
-          <h1 className="text-5xl md:text-7xl lg:text-[88px] font-black text-slate-900 dark:text-white leading-[1.02] tracking-[-0.04em]">
-            İnternetteki<br />
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-accent via-emerald-400 to-[#059669]">dağınıklığı</span>
-            <br />düzenleyin.
+          <h1 className="text-5xl md:text-7xl lg:text-[88px] font-black text-slate-900 dark:text-white leading-[1.02] tracking-[-0.04em] text-center">
+            Sekmeler arasında<br />
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-accent via-emerald-400 to-[#059669]">can çekişen</span>
+            <br />fikirleri kurtarın.
           </h1>
 
-          <p className="text-lg md:text-xl font-medium text-slate-500 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
-            Tarayıcı sekmelerinde kaybolan, WhatsApp gruplarında unutulan linkleri{' '}
-            <span className="text-slate-800 dark:text-slate-200 font-semibold">tek bir akıllı, minimal ve görsel kütüphanede</span>{' '}
-            toplayın.
+          <p className="text-lg md:text-xl font-medium text-slate-500 dark:text-slate-400 max-w-3xl mx-auto leading-relaxed text-center">
+            WhatsApp gruplarında çürüyen, tarayıcı yer imlerinde tozlanan tüm bağlantılarınızı; yapay zeka destekli okuma süreleri, akıllı hatırlatıcı alarmlar ve muhteşem görsel kartlarla <span className="text-slate-800 dark:text-slate-200 font-bold">dijital ikinci beyninizde</span> saklayın.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
@@ -280,13 +292,13 @@ export const LandingView: React.FC = () => {
               onClick={() => handleOpenAuth(true)}
               whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
               className="w-full sm:w-auto flex items-center justify-center gap-2.5 bg-accent text-white text-sm font-bold px-8 py-4 rounded-2xl shadow-lg shadow-accent/20 hover:shadow-xl hover:shadow-accent/25 group border-none cursor-pointer">
-              <span>Ücretsiz Başla — Kurulum Gerekmez</span>
+              <span>Zihnimi Hafifletmek İstiyorum — Ücretsiz</span>
               <ArrowRight size={15} className="group-hover:translate-x-1 transition-transform" />
             </motion.button>
             <motion.a href="#mockup" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               className="w-full sm:w-auto flex items-center justify-center gap-2 text-slate-600 dark:text-slate-300 text-sm font-bold px-7 py-4 rounded-2xl border border-gray-200 dark:border-[#2c2c2e] hover:bg-slate-50 dark:hover:bg-[#121215] transition-all no-underline">
               <Play size={13} className="fill-current" />
-              Arayüzü İncele
+              Sihirli Arayüzü İncele
             </motion.a>
           </div>
 
@@ -299,9 +311,67 @@ export const LandingView: React.FC = () => {
               ))}
             </div>
             <div className="flex gap-0.5">{[1,2,3,4,5].map(i => <Star key={i} size={11} className="fill-amber-400 text-amber-400" />)}</div>
-            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">500+ aktif kullanıcı</span>
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">500+ dijital üretici Keepr ile organize oluyor</span>
           </motion.div>
         </motion.div>
+      </section>
+
+      {/* ── PROBLEM ── */}
+      <section className="px-6 py-24 bg-white dark:bg-[#070708] border-t border-gray-100 dark:border-[#121215] relative overflow-hidden">
+        <div className="absolute left-1/4 top-1/2 w-[400px] h-[400px] bg-red-500/5 rounded-full blur-[100px] pointer-events-none" />
+        <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center gap-12 relative z-10">
+          <div className="flex-1 space-y-6 text-left">
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-red-500 bg-red-500/10 px-2.5 py-1 rounded-full border border-red-500/20">ZİHİNSEL DAĞINIKLIK</span>
+            <h2 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">
+              Zihniniz sekmeleriniz kadar dolu. Ve bu durum sizi sessizce tüketiyor.
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+              İnternet her gün karşımıza harika makaleler, videolar, tasarımlar ve ilham verici fikirler çıkarıyor. Ama onları saklamak tam bir kaos. Tarayıcınızda biriken 40 açık sekme cihazınızı yavaşlatırken zihninizi de yorar. Kendi kendinize WhatsApp'tan attığınız linkler sohbet geçmişinde kaybolur; yer imi (bookmark) klasörleriniz ise bir daha hiç açılmayacak tozlu link mezarlıklarına dönüşür.
+            </p>
+          </div>
+          <div className="w-full md:w-[320px] bg-red-500/5 border border-red-500/10 rounded-3xl p-6 space-y-4 text-left">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">🤯</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Sekme Yorgunluğu (Tab Fatigue)</span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Bilgisayarınızda açık bıraktığınız her sekme, aslında zihninizde açık kalan ve odaklanmanızı engelleyen bitmemiş birer görevdir.</p>
+            <div className="w-full h-[1px] bg-red-500/10" />
+            <div className="flex items-center gap-3">
+              <span className="text-xl">🗑️</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Unutulan Değerli Fikirler</span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Pocket veya tarayıcı listelerine "sonra okurum" diye kaydettiğiniz bağlantıların %87'sini bir daha asla açıp bakmazsınız.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── SOLUTION ── */}
+      <section className="px-6 py-24 bg-slate-50/50 dark:bg-[#0a0a0c]/50 border-y border-gray-100 dark:border-[#121215] relative overflow-hidden">
+        <div className="absolute right-1/4 top-1/2 w-[400px] h-[400px] bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none" />
+        <div className="max-w-4xl mx-auto flex flex-col md:flex-row-reverse items-center gap-12 relative z-10">
+          <div className="flex-1 space-y-6 text-left">
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">DİJİTAL İKİNCİ BEYİN</span>
+            <h2 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">
+              Sekmeleri korkusuzca kapatın. Keepr sizin yerinize hatırlar.
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+              Keepr, dijital dünyadaki düzenli arşivinizdir. Kopyaladığınız bir bağlantıyı webde veya mobilde anında otomatik algılar ve sizi yormadan kaydeder. Yapay zekayla okuma süreleri çıkarılır, akıllı alarmlarla makaleleriniz tam okumak istediğiniz anda karşınıza getirilir. Zihninizi hafifletin, sekmeleri kapatın; Keepr her şeyi organize etsin.
+            </p>
+          </div>
+          <div className="w-full md:w-[320px] bg-emerald-500/5 border border-emerald-500/10 rounded-3xl p-6 space-y-4 text-left">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">✨</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Pano Algılama (Auto-Paste)</span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Tek tek link yapıştırmakla uğraşmayın. Panonuza kopyaladığınız linki Keepr anında bulur ve kaydetmenizi önerir.</p>
+            <div className="w-full h-[1px] bg-emerald-500/10" />
+            <div className="flex items-center gap-3">
+              <span className="text-xl">🔔</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Zamanlı Alarm Hatırlatıcı</span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">İçerikleri kaydetmek yetmez. Onlara alarm kurun, zamanı geldiğinde şık bir bildirim ve e-postayla hatırlatalım.</p>
+          </div>
+        </div>
       </section>
 
       {/* ── STATS BAR ── */}
@@ -555,8 +625,8 @@ export const LandingView: React.FC = () => {
             <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center mb-6">
               <Zap size={20} className="text-white" fill="rgba(255,255,255,0.3)" />
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">Otomatik Metadata & Analiz</h3>
-            <p className="text-xs text-emerald-100 leading-relaxed max-w-sm">Yapıştırdığınız bağlantının başlığını, açıklamasını, favicon'ını ve okuma süresini arka planda saniyeler içinde otomatik çıkarırız.</p>
+            <h3 className="text-xl font-bold text-white mb-2">Yapay Zeka Destekli Akıllı Analiz</h3>
+            <p className="text-xs text-emerald-100 leading-relaxed max-w-sm">Manuel veri girişi devri bitti! Linki yapıştırdığınız milisaniyeler içinde başlığı, site logolarını, detaylı açıklamaları ve hatta okuma süresi tahminini arka planda otomatik çekip hazırlarız.</p>
           </motion.div>
 
           {/* Team / Shared folders */}
@@ -568,8 +638,8 @@ export const LandingView: React.FC = () => {
             <div className="w-11 h-11 rounded-2xl bg-violet-500/10 flex items-center justify-center mb-5">
               <Users size={20} className="text-violet-500" />
             </div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Ortak Klasör & Ekip Rolleri</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Ekibinizle güvenli davet kodlarıyla klasörlerinizi paylaşın. Kullanıcıları Editör veya Viewer (Salt Okunur) yetkileriyle sınırlandırın.</p>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Ortak Klasörler & Ekip Rolleri</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Ekibinizle klasör paylaşın. Kullanıcıları "Editör" veya "İzleyici (Salt Okunur)" yetkileriyle sınırlandırın. 48 saatlik güvenli token davet linkleriyle anında ortak çalışmaya başlayın.</p>
             <div className="mt-4 flex items-center gap-2">
               <div className="flex -space-x-2">
                 {['🧑‍💻','👩‍🎨','👨‍💼','👩‍🔬'].map((e, i) => (
@@ -586,8 +656,8 @@ export const LandingView: React.FC = () => {
             <div className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-[#1c1c1e] flex items-center justify-center mb-5">
               <span className="text-lg">⌨️</span>
             </div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Klavye Kısayolları</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">Linear ve Superhuman seviyesinde hız. Seçili karta F, P, A tuşlarıyla eylem yapın.</p>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Linear Hızında Kısayollar</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">Fareye dokunmadan ışık hızında yönetim. Seçili kartlarda F (Favori), P (Sabitle), A (Alarm) ve Backspace (Sil) tuşlarıyla saniyeler kazanın.</p>
             <div className="grid grid-cols-3 gap-1.5">
               {[['F','Favori'],['P','Sabitle'],['A','Alarm']].map(([key, label]) => (
                 <div key={key} className="bg-slate-50 dark:bg-[#1c1c1e] rounded-lg p-2 text-center">
@@ -608,7 +678,7 @@ export const LandingView: React.FC = () => {
               <FolderTree size={20} className="text-emerald-500" />
             </div>
             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Alt Klasör Hiyerarşisi</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Ana klasörlerinizin altına 2 seviyeye kadar alt klasörler oluşturun. Karmaşık bağlantı listelerinizi temiz ve düzenli bir ağaç yapısında saklayın.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Derinlemesine kitaplık düzeni. Ana kategorilerinizin altına alt klasörler ekleyerek "Tasarım &gt; İlham &gt; Mobil" gibi kusursuz bir kütüphane ağaç yapısı oluşturun.</p>
             <div className="mt-4 flex gap-1.5 items-center text-[9px] text-slate-400">
               <Folder size={11} className="text-slate-400" />
               <span>Klasör</span>
@@ -617,6 +687,111 @@ export const LandingView: React.FC = () => {
               <span className="font-bold text-slate-600 dark:text-slate-300">Alt Klasör</span>
             </div>
           </motion.div>
+
+          {/* Themes & Dark Mode */}
+          <motion.div whileHover={{ y: -4, scale: 1.01 }} transition={{ type: 'spring', stiffness: 300 }}
+            className="bg-white dark:bg-[#121212] border border-gray-100 dark:border-[#1c1c1e] rounded-3xl p-7 shadow-sm cursor-default relative overflow-hidden">
+            <div className="absolute top-3 right-3">
+              <span className="text-[8px] font-black bg-accent/10 text-accent border border-accent/20 px-2 py-0.5 rounded-full uppercase">PRO</span>
+            </div>
+            <div className="w-11 h-11 rounded-2xl bg-rose-500/10 flex items-center justify-center mb-5">
+              <Sparkles size={20} className="text-rose-500" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Özel Premium Temalar</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Görsel zevkinize uydurun. 5 farklı ultra-şık accent rengi ve kusursuz OLED koyu mod (dark mode) geçişi ile arayüzü tamamen kendinize özel kılın.</p>
+            <div className="mt-4 flex items-center gap-1.5">
+              {['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6'].map((c, i) => (
+                <div key={i} className="w-5 h-5 rounded-full border-2 border-white dark:border-[#121212] shadow-sm" style={{ backgroundColor: c }} />
+              ))}
+              <span className="text-[8px] font-bold text-slate-400 ml-1">+ Dark Mode</span>
+            </div>
+          </motion.div>
+
+          {/* Grid & List View */}
+          <motion.div whileHover={{ y: -4, scale: 1.01 }} transition={{ type: 'spring', stiffness: 300 }}
+            className="bg-white dark:bg-[#121212] border border-gray-100 dark:border-[#1c1c1e] rounded-3xl p-7 shadow-sm cursor-default">
+            <div className="w-11 h-11 rounded-2xl bg-sky-500/10 flex items-center justify-center mb-5">
+              <Laptop size={20} className="text-sky-500" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Grid & Liste Düzenleri</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Pinterest tarzı zengin kartlar veya ultra-kompakt liste modu. Çalışma alışkanlıklarınıza ve ekran yapınıza göre tek tıkla düzeninizi değiştirin.</p>
+            <div className="mt-4 flex gap-2">
+              <div className="flex-1 bg-accent/5 border border-accent/15 rounded-lg p-2 text-center">
+                <span className="text-[9px] font-bold text-accent">Grid</span>
+                <div className="grid grid-cols-3 gap-0.5 mt-1">
+                  {[1,2,3,4,5,6].map(i => <div key={i} className="h-1.5 bg-accent/20 rounded" />)}
+                </div>
+              </div>
+              <div className="flex-1 bg-slate-50 dark:bg-[#1c1c1e] border border-gray-100 dark:border-[#2c2c2e] rounded-lg p-2 text-center">
+                <span className="text-[9px] font-bold text-slate-400">List</span>
+                <div className="flex flex-col gap-0.5 mt-1">
+                  {[1,2,3].map(i => <div key={i} className="h-1.5 bg-slate-200 dark:bg-[#2c2c2e] rounded" />)}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Favorites & Pinning — full width */}
+          <motion.div whileHover={{ y: -4, scale: 1.01 }} transition={{ type: 'spring', stiffness: 300 }}
+            className="md:col-span-3 bg-gradient-to-r from-rose-500 via-pink-500 to-violet-500 rounded-3xl p-8 shadow-xl relative overflow-hidden cursor-default select-none">
+            <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="flex items-start justify-between">
+              <div className="space-y-2 max-w-md">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center">
+                    <Star size={20} className="text-white" fill="rgba(255,255,255,0.4)" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">Favoriler & Başa Sabitleme</h3>
+                    <span className="text-[8px] font-black bg-white/20 text-white px-2 py-0.5 rounded-full uppercase">PRO</span>
+                  </div>
+                </div>
+                <p className="text-xs text-white/80 leading-relaxed max-w-sm">Gün içinde elinizin altında olması gereken en kritik linklerinizi ❤️ ile favorileyin veya 📌 ile listenin en tepesine kilitleyin. Mobilde sola kaydırarak anında silme, toplu seçim ile saniyeler içinde klasörler arası taşıma gücü.</p>
+              </div>
+              <div className="hidden md:flex flex-col gap-2 flex-shrink-0 ml-6">
+                <div className="bg-white/15 backdrop-blur rounded-xl px-4 py-2 text-[9px] text-white flex items-center gap-2">
+                  <span>❤️</span> <span className="font-bold">Favorilere Eklendi</span>
+                </div>
+                <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-2 text-[9px] text-white/70 flex items-center gap-2">
+                  <span>📌</span> <span className="font-bold">Başa Sabitlendi</span>
+                </div>
+                <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-2 text-[9px] text-white/70 flex items-center gap-2">
+                  <span>🗑️</span> <span className="font-bold">Sola Kaydır → Sil</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── HOW IT WORKS ── */}
+      <section className="px-6 py-24 bg-white dark:bg-[#0a0a0c] border-y border-gray-100 dark:border-[#121215]">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-16 space-y-3">
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-accent">Nasıl Çalışır?</span>
+            <h2 className="text-4xl font-black tracking-tight text-slate-900 dark:text-white">3 adımda dijital düzen.</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">Hesap oluşturun, bağlantılarınızı yapıştırın, gerisini Keepr halletsin.</p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              { step: '01', title: 'Ücretsiz Kaydolun', desc: '30 saniyede hesap oluşturun. Kredi kartı gerekmez, kurulum yok. E-posta ve şifrenizle hemen başlayın.', icon: '🚀', gradient: 'from-accent to-emerald-500' },
+              { step: '02', title: 'Linkleri Yapıştırın', desc: 'URL yapıştırın veya kopyaladığınızda otomatik algılansın. Keepr başlık, açıklama, favicon ve okuma süresini saniyeler içinde çeker.', icon: '📋', gradient: 'from-blue-500 to-violet-500' },
+              { step: '03', title: 'Düzenleyin & Paylaşın', desc: 'Kategorilere ayırın, alt klasörler oluşturun, alarm kurun. Ekibinizle güvenli davet linkleriyle ortak klasörler açın.', icon: '✨', gradient: 'from-violet-500 to-rose-500' },
+            ].map((item, i) => (
+              <motion.div key={i} initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.15, duration: 0.6 }}
+                className="relative text-center space-y-4">
+                <div className="relative inline-flex mx-auto">
+                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${item.gradient} flex items-center justify-center text-2xl shadow-lg`}>
+                    <span className="text-2xl">{item.icon}</span>
+                  </div>
+                  <span className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[10px] font-black flex items-center justify-center shadow">{item.step}</span>
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">{item.title}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mx-auto">{item.desc}</p>
+                {i < 2 && <div className="hidden md:block absolute top-8 -right-4 w-8 text-center text-slate-300 dark:text-slate-600 text-lg">→</div>}
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -808,38 +983,78 @@ export const LandingView: React.FC = () => {
               </table>
             </div>
           </div>
+
+          {/* ROI Calculator Card */}
+          <div className="max-w-3xl mx-auto mt-16 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/20 rounded-3xl p-8 shadow-2xl relative overflow-hidden text-white select-none">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl pointer-events-none" />
+            
+            <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
+              <div className="flex-1 space-y-6 w-full text-left">
+                <div>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">VERİMLİLİK HESAPLAYICI</span>
+                  <h3 className="text-xl font-bold mt-3">Keepr ile ne kadar tasarruf edebilirsiniz?</h3>
+                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">Ekibinizin link arayarak ve dağınık tarayıcı sekmelerinde kaybolarak kaybettiği zamanı ve yıllık maliyetini hesaplayın.</p>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Slider 1 */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span className="text-slate-300">Günlük Aranan/Kaybolan Link:</span>
+                      <span className="text-accent font-bold">{dailyLinks} Adet</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="30"
+                      value={dailyLinks}
+                      onChange={(e) => setDailyLinks(parseInt(e.target.value))}
+                      className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-accent"
+                    />
+                  </div>
+
+                  {/* Slider 2 */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span className="text-slate-300">Ekip Üyesi Sayısı:</span>
+                      <span className="text-violet-400 font-bold">{teamSize} Kişi</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="100"
+                      value={teamSize}
+                      onChange={(e) => setTeamSize(parseInt(e.target.value))}
+                      className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Display panel */}
+              <div className="w-full md:w-64 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 flex flex-col justify-center items-center text-center space-y-4 shadow-xl">
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">YILLIK KAZANILAN ZAMAN</div>
+                  <div className="text-3xl font-black text-emerald-400 mt-1">{yearlyTimeSaved} Saat</div>
+                </div>
+                <div className="w-full h-[1px] bg-white/10" />
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">YILLIK KAZANILAN VERİMLİLİK</div>
+                  <div className="text-3xl font-black text-accent mt-1">${yearlyMoneySaved.toLocaleString()}</div>
+                </div>
+                <button
+                  onClick={() => handleOpenAuth(true)}
+                  className="w-full py-3 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl transition-all cursor-pointer border-none shadow-md shadow-accent/20 hover:scale-[1.02] active:scale-98"
+                >
+                  Verimliliğinizi Artırın
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* ── TESTIMONIALS ── */}
-      <section className="px-6 py-20 bg-slate-50/30 dark:bg-[#08080a]/30 border-y border-gray-100 dark:border-[#121215]">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12 space-y-3">
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-accent">Kullanıcı Yorumları</span>
-            <h2 className="text-4xl font-black tracking-tight text-slate-900 dark:text-white">Keepr kullananlar ne diyor?</h2>
-          </div>
-          <div className="grid md:grid-cols-3 gap-5">
-            {[
-              { name: 'Caner Kurt', role: 'Full Stack Developer', emoji: '🧑‍💻', text: 'Her gün onlarca makale okuyorum. Sekmelerde kaybolmak yerine Keepr\'a tek tıkla yolluyorum, dijital dağınıklığım tamamen bitti. Alarm özelliği de inanılmaz.' },
-              { name: 'Selin Yılmaz', role: 'UX/UI Designer', emoji: '👩‍🎨', text: 'Tasarım örneklerini, makaleleri ve beğendiğim arayüzleri klasörlemek çok keyifli. Okuma süresi özelliği hangi içeriğe öncelik vereceğimi belirlememe yardım ediyor.' },
-              { name: 'Mert Demir', role: 'Product Manager', emoji: '👨‍💼', text: 'Sabitleme ve favorileme özellikleri en sık kullandığım araçlar. Klavye kısayolları da verimliliğimi ciddi artırdı. Team versiyonunu sabırsızlıkla bekliyoruz.' },
-            ].map((t, i) => (
-              <motion.div key={i} initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1 }}
-                className="bg-white dark:bg-[#121212] border border-gray-100 dark:border-[#1c1c1e] p-6 rounded-2xl shadow-xs space-y-4">
-                <div className="flex gap-0.5">{[1,2,3,4,5].map(s => <Star key={s} size={11} className="fill-amber-400 text-amber-400" />)}</div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">"{t.text}"</p>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-[#1c1c1e] flex items-center justify-center text-sm">{t.emoji}</div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200">{t.name}</div>
-                    <div className="text-[10px] text-slate-400">{t.role}</div>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* ── FAQ ── */}
       <section className="px-6 py-20 max-w-3xl mx-auto">

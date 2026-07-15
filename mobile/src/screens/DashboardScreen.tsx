@@ -16,7 +16,7 @@ import {
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Search, ArrowUpDown, Plus, Bookmark, Folder, Settings, Heart, Trash2, Check, X, Globe, Users, Pin } from 'lucide-react-native';
+import { Search, ArrowUpDown, Plus, Bookmark, Folder, Settings, Heart, Trash2, Check, X, Globe, Users, Pin, CornerDownRight } from 'lucide-react-native';
 import api from '../services/api';
 import { KeepCard, Keep } from '../components/KeepCard';
 import { AddKeepModal } from '../components/AddKeepModal';
@@ -25,8 +25,10 @@ import { ManageCategoriesModal } from '../components/ManageCategoriesModal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { SettingsModal } from '../components/SettingsModal';
 import { AcceptInviteModal } from '../components/AcceptInviteModal';
+import { ClipboardDetect } from '../components/ClipboardDetect';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useToast } from '../context/ToastContext';
 import { Typography, Radius } from '../theme';
 import { useShareIntentContext } from 'expo-share-intent';
 import * as SecureStore from 'expo-secure-store';
@@ -54,6 +56,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const insets = useSafeAreaInsets();
   const { colors, themeMode } = useTheme();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProModalOpen, setIsProModalOpen] = useState(false);
   const [lockedFeature, setLockedFeature] = useState<string | null>(null);
@@ -147,7 +150,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       setKeeps(keepsResp.data);
     } catch (error) {
       console.error('Error fetching data:', error);
-      Alert.alert('Hata', 'Veriler yüklenirken bir sorun oluştu.');
+      showToast('Veriler yüklenirken bir sorun oluştu.', 'error');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -181,7 +184,19 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       fetchData(false);
     } catch (error: any) {
       const errMsg = error.response?.data?.error || 'Bağlantı eklenemedi.';
-      Alert.alert('Hata', errMsg);
+      showToast(errMsg, 'error');
+    }
+  };
+
+  const handleAutoSaveKeep = async (url: string) => {
+    try {
+      const categoryId = typeof selectedCategoryId === 'number' ? selectedCategoryId : null;
+      await api.post('/api/keeps', { url, category_id: categoryId });
+      fetchData(false);
+      showToast('Bağlantı panodan otomatik olarak kaydedildi.', 'success');
+    } catch (error: any) {
+      const errMsg = error.response?.data?.error || 'Bağlantı eklenemedi.';
+      showToast(errMsg, 'error');
     }
   };
 
@@ -231,7 +246,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const handleToggleSelect = (id: number) => {
     const keep = keeps.find((k) => k.id === id);
     if (keep && isKeepReadOnly(keep)) {
-      Alert.alert('Salt Okunur', 'Salt okunur bağlantılar üzerinde toplu işlem yapılamaz.');
+      showToast('Salt okunur bağlantılar üzerinde toplu işlem yapılamaz.', 'error');
       return;
     }
     setSelectedKeepIds((prev) => {
@@ -266,7 +281,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       fetchData(false);
     } catch (error) {
       console.error(error);
-      Alert.alert('Hata', 'Toplu işlem sırasında bir hata oluştu.');
+      showToast('Toplu işlem sırasında bir hata oluştu.', 'error');
     }
   };
 
@@ -283,17 +298,43 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       fetchData(false);
     } catch (error) {
       console.error(error);
-      Alert.alert('Hata', 'Toplu işlem sırasında bir hata oluştu.');
+      showToast('Toplu işlem sırasında bir hata oluştu.', 'error');
     }
   };
 
   const handleCreateCategory = async (name: string, parentId?: number | null) => {
+    const isPro = user?.subscription_type === 'pro' || user?.subscription_type === 'team';
+    
+    // Alt klasör için Pro/Team gereklidir
+    if (parentId && !isPro) {
+      setIsManageCategoriesOpen(false);
+      triggerProModal('category');
+      throw new Error('PRO_REQUIRED');
+    }
+    
+    // Ücretsiz kullanıcı için 10 kategori sınırı (alt klasör hariç)
+    if (!isPro && !parentId && categories.filter(c => !c.parent_id).length >= 10) {
+      setIsManageCategoriesOpen(false);
+      triggerProModal('category');
+      throw new Error('PRO_REQUIRED');
+    }
+
     try {
       await api.post('/api/categories', { name, icon: 'folder', parent_id: parentId });
       fetchData(false);
     } catch (error: any) {
-      const errMsg = error.response?.data?.error || 'Kategori oluşturulamadı.';
-      Alert.alert('Hata', errMsg);
+      const code = error.response?.data?.code;
+      if (code === 'PRO_REQUIRED') {
+        setIsManageCategoriesOpen(false);
+        triggerProModal('category');
+        throw error;
+      } else if (code === 'TEAM_REQUIRED') {
+        setIsManageCategoriesOpen(false);
+        triggerProModal('share');
+        throw error;
+      }
+      const errMsg = error.response?.data?.error || error.response?.data?.message || 'Kategori oluşturulamadı.';
+      showToast(errMsg, 'error');
       throw error;
     }
   };
@@ -307,17 +348,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       fetchData(false);
     } catch (error: any) {
       const errMsg = error.response?.data?.error || 'Kategori silinemedi.';
-      Alert.alert('Hata', errMsg);
+      showToast(errMsg, 'error');
       throw error;
     }
   };
 
   const handleShareCategory = async (id: number, isPublic: boolean): Promise<Category> => {
     if (isPublic && user?.subscription_type !== 'team') {
-      Alert.alert(
-        'Ekip Özelliği',
-        'Koleksiyon paylaşma özelliği yalnızca Keepr Team üyelerine özeldir.'
-      );
+      showToast('Koleksiyon paylaşma özelliği yalnızca Keepr Team üyelerine özeldir.', 'error');
       throw new Error('Team subscription required');
     }
     try {
@@ -328,42 +366,22 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       return response.data;
     } catch (error: any) {
       const errMsg = error.response?.data?.error || 'Paylaşım ayarı güncellenemedi.';
-      Alert.alert('Hata', errMsg);
+      showToast(errMsg, 'error');
       throw error;
     }
   };
 
-  // iOS Native Action Sheet for Sort Options selection
+  // Instant cycle sorting toggler with toast info
   const handleSortPress = () => {
-    const options = ['İptal', 'En Yeni', 'En Eski', 'A - Z', 'Z - A'];
-    const destructiveButtonIndex = undefined;
-    const cancelButtonIndex = 0;
-
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options,
-          cancelButtonIndex,
-          destructiveButtonIndex,
-          title: 'Sıralama Seçenekleri',
-        },
-        (buttonIndex) => {
-          if (buttonIndex === 1) setSortBy('newest');
-          else if (buttonIndex === 2) setSortBy('oldest');
-          else if (buttonIndex === 3) setSortBy('alphabetical-asc');
-          else if (buttonIndex === 4) setSortBy('alphabetical-desc');
-        }
-      );
-    } else {
-      // Android dialog fallback
-      Alert.alert('Sıralama Seçenekleri', '', [
-        { text: 'İptal', style: 'cancel' },
-        { text: 'En Yeni', onPress: () => setSortBy('newest') },
-        { text: 'En Eski', onPress: () => setSortBy('oldest') },
-        { text: 'A - Z', onPress: () => setSortBy('alphabetical-asc') },
-        { text: 'Z - A', onPress: () => setSortBy('alphabetical-desc') },
-      ]);
-    }
+    const nextSort = sortBy === 'newest' ? 'oldest' : sortBy === 'oldest' ? 'alphabetical-asc' : sortBy === 'alphabetical-asc' ? 'alphabetical-desc' : 'newest';
+    setSortBy(nextSort);
+    const names = {
+      'newest': 'En Yeni',
+      'oldest': 'En Eski',
+      'alphabetical-asc': 'A - Z (Alfabetik)',
+      'alphabetical-desc': 'Z - A (Alfabetik)'
+    };
+    showToast(`Sıralama: ${names[nextSort]}`, 'info');
   };
 
   // Filter & sort keeps client-side
@@ -374,7 +392,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     if (selectedCategoryId === 'favorites') {
       result = result.filter((k) => k.is_favorite === true);
     } else if (selectedCategoryId !== undefined) {
-      result = result.filter((k) => k.category_id === selectedCategoryId);
+      const subCatIds = categories.filter(c => c.parent_id === selectedCategoryId).map(c => c.id);
+      if (subCatIds.length > 0) {
+        result = result.filter((k) => k.category_id === selectedCategoryId || (k.category_id !== null && subCatIds.includes(k.category_id)));
+      } else {
+        result = result.filter((k) => k.category_id === selectedCategoryId);
+      }
     }
 
     // Filter by search text
@@ -415,26 +438,38 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
   const sortedCategories = useMemo(() => {
     const rootCats = categories.filter(c => !c.parent_id);
-    const sorted: Category[] = [];
+    const sorted: (Category & { isSubfolder?: boolean; parentName?: string })[] = [];
     for (const root of rootCats) {
-      sorted.push(root);
+      sorted.push({ ...root, isSubfolder: false });
       const subCats = categories.filter(sub => sub.parent_id === root.id);
       for (const sub of subCats) {
-        sorted.push({ ...sub, name: `↳ ${sub.name}` });
+        sorted.push({ ...sub, isSubfolder: true, parentName: root.name });
       }
     }
     return sorted;
   }, [categories]);
 
-  // Get active category header label
-  const activeCategoryTitle = useMemo(() => {
-    if (selectedCategoryId === undefined) return 'Tüm Bağlantılar';
-    if (selectedCategoryId === null) return 'Kategorisiz (Genel)';
-    if (selectedCategoryId === 'favorites') return 'Favorilerim';
-    return categories.find((c) => c.id === selectedCategoryId)?.name || 'Kategori';
+  const mainCategories = useMemo(() => {
+    return categories.filter(c => !c.parent_id);
+  }, [categories]);
+
+  const activeParentId = useMemo(() => {
+    if (typeof selectedCategoryId === 'number') {
+      const cat = categories.find(c => c.id === selectedCategoryId);
+      if (cat) {
+        return cat.parent_id || cat.id;
+      }
+    }
+    return null;
   }, [selectedCategoryId, categories]);
 
-  // Compute local keep count badges
+  const subCategories = useMemo(() => {
+    if (activeParentId !== null) {
+      return categories.filter(c => c.parent_id === activeParentId);
+    }
+    return [];
+  }, [activeParentId, categories]);
+
   const keepCounts = useMemo(() => {
     const counts: Record<number | string, number> = {
       all: 0,
@@ -455,6 +490,20 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     return counts;
   }, [keeps]);
 
+  const activeCategoryTitle = useMemo(() => {
+    if (selectedCategoryId === undefined) return 'Tüm Bağlantılar';
+    if (selectedCategoryId === null) return 'Kategorisiz (Genel)';
+    if (selectedCategoryId === 'favorites') return 'Favorilerim';
+    return categories.find((c) => c.id === selectedCategoryId)?.name || 'Kategori';
+  }, [selectedCategoryId, categories]);
+
+  const getSubBarParentCount = useCallback((parentId: number) => {
+    const parentCount = keepCounts[parentId] || 0;
+    const subIds = categories.filter(c => c.parent_id === parentId).map(c => c.id);
+    const subCount = subIds.reduce((sum, id) => sum + (keepCounts[id] || 0), 0);
+    return parentCount + subCount;
+  }, [keepCounts, categories]);
+
   return (
     <View style={[styles.safeArea, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       
@@ -463,19 +512,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         <View style={styles.headerTitleRow}>
           <Image source={require('../../assets/logo.png')} style={styles.headerLogo} />
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-             <Text style={[styles.headerText, { color: colors.text, fontWeight: '900', letterSpacing: 0.8, fontSize: 13 }]}>KEEPR</Text>
-             {user?.subscription_type === 'pro' && (
-               <View style={{ marginLeft: 5, backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.2)', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 }}>
-                 <Text style={{ fontSize: 7, color: '#10b981', fontWeight: '900' }}>PRO</Text>
-               </View>
-             )}
-             {user?.subscription_type === 'team' && (
-               <View style={{ marginLeft: 5, backgroundColor: 'rgba(139, 92, 246, 0.1)', borderWidth: 1, borderColor: 'rgba(139, 92, 246, 0.2)', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 }}>
-                 <Text style={{ fontSize: 7, color: '#8b5cf6', fontWeight: '900' }}>TEAM</Text>
-               </View>
-             )}
-            <View style={{ width: 1, height: 10, backgroundColor: colors.border, marginHorizontal: 6 }} />
-            <Text style={{ fontSize: 9, color: colors.textMuted, fontWeight: '700' }}>Dijital Havuz</Text>
+            <Text style={[styles.headerText, { color: colors.text, fontWeight: '900', letterSpacing: 0.5, fontSize: 12 }]}>@{user?.username}</Text>
+            {user?.subscription_type === 'pro' && (
+              <View style={{ marginLeft: 5, backgroundColor: '#34C759', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 12 }}>
+                <Text style={{ fontSize: 7, color: '#ffffff', fontWeight: '900' }}>PRO</Text>
+              </View>
+            )}
+            {user?.subscription_type === 'team' && (
+              <View style={{ marginLeft: 5, backgroundColor: '#8B5CF6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 12 }}>
+                <Text style={{ fontSize: 7, color: '#ffffff', fontWeight: '900' }}>TEAM</Text>
+              </View>
+            )}
           </View>
         </View>
         <TouchableOpacity onPress={() => setIsSettingsOpen(true)} style={styles.logoutBtn} activeOpacity={0.6}>
@@ -492,7 +539,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             { id: undefined, name: 'Tümü' },
             { id: null, name: 'Genel' },
             { id: 'favorites', name: 'Favoriler' },
-            ...sortedCategories,
+            ...mainCategories,
             { id: -999, name: 'Yönet' },
           ]}
           keyExtractor={(item) => (item.id === undefined ? 'all' : item.id === null ? 'uncat' : item.id === 'favorites' ? 'fav' : item.id === -999 ? 'manage' : String(item.id))}
@@ -513,14 +560,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               );
             }
 
-            const isSelected = selectedCategoryId === item.id;
+            const isSelected = selectedCategoryId === item.id || activeParentId === item.id;
             const badgeCount = item.id === undefined 
               ? keepCounts.all 
               : item.id === null 
                 ? keepCounts.uncategorized 
                 : item.id === 'favorites' 
                   ? keepCounts.favorites 
-                  : keepCounts[item.id] || 0;
+                  : getSubBarParentCount(item.id as number);
 
             return (
               <TouchableOpacity
@@ -537,9 +584,25 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                     <Globe size={10} color={isSelected ? '#fff' : '#10B981'} style={{ marginRight: 4 }} />
                   )}
                   {'collaborator_role' in item && item.collaborator_role && (
-                    <Users size={10} color={isSelected ? '#fff' : '#8B5CF6'} style={{ marginRight: 4 }} />
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : 'rgba(139, 92, 246, 0.1)',
+                      paddingHorizontal: 5,
+                      paddingVertical: 1.5,
+                      borderRadius: 4,
+                      marginRight: 6
+                    }}>
+                      <Users size={9} color={isSelected ? '#fff' : '#8B5CF6'} style={{ marginRight: 2 }} />
+                      <Text style={{ fontSize: 7.5, fontWeight: '900', color: isSelected ? '#fff' : '#8B5CF6' }}>
+                        {item.collaborator_role === 'editor' ? 'EDİTÖR' : 'İZLEYİCİ'}
+                      </Text>
+                    </View>
                   )}
-                  <Text style={[styles.categoryTabText, { color: isSelected ? '#fff' : colors.text }]}>
+                  <Text style={[
+                    styles.categoryTabText,
+                    { color: isSelected ? '#fff' : colors.text }
+                  ]}>
                     {item.name}
                   </Text>
                 </View>
@@ -559,6 +622,80 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           }}
         />
       </View>
+
+      {/* SUBCATEGORY SWITCHER BAR (Horizontal scroll) */}
+      {subCategories.length > 0 && (
+        <View style={[styles.subcategoryBar, { borderColor: colors.border, backgroundColor: colors.background }]}>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={[
+              { id: activeParentId!, name: 'Tümü' },
+              ...subCategories,
+            ]}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={styles.subcategoryScroll}
+            renderItem={({ item }) => {
+              const isSelected = selectedCategoryId === item.id;
+              const isParentItem = item.id === activeParentId;
+              const badgeCount = isParentItem 
+                ? getSubBarParentCount(activeParentId!)
+                : keepCounts[item.id] || 0;
+
+              return (
+                <TouchableOpacity
+                  onPress={() => setSelectedCategoryId(item.id)}
+                  style={[
+                    styles.subcategoryTab,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                    isSelected && { backgroundColor: colors.primary, borderColor: colors.primary },
+                  ]}
+                  activeOpacity={0.7}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {!isParentItem && (
+                      <CornerDownRight size={10} color={isSelected ? '#fff' : colors.primary} style={{ marginRight: 4 }} />
+                    )}
+                    {'collaborator_role' in item && item.collaborator_role && (
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : 'rgba(139, 92, 246, 0.1)',
+                        paddingHorizontal: 4,
+                        paddingVertical: 1,
+                        borderRadius: 3.5,
+                        marginRight: 5
+                      }}>
+                        <Users size={8} color={isSelected ? '#fff' : '#8B5CF6'} style={{ marginRight: 1.5 }} />
+                        <Text style={{ fontSize: 7, fontWeight: '900', color: isSelected ? '#fff' : '#8B5CF6' }}>
+                          {item.collaborator_role === 'editor' ? 'EDİTÖR' : 'İZLEYİCİ'}
+                        </Text>
+                      </View>
+                    )}
+                    <Text style={[
+                      styles.subcategoryTabText, 
+                      { color: isSelected ? '#fff' : colors.text }
+                    ]}>
+                      {isParentItem ? 'Ana Klasör' : item.name}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.countBadge,
+                      { backgroundColor: colors.background },
+                      isSelected && { backgroundColor: 'rgba(255,255,255,0.2)' },
+                    ]}
+                  >
+                    <Text style={[styles.countText, { color: isSelected ? '#fff' : colors.textMuted }]}>
+                      {badgeCount}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
+      )}
 
       {/* SEARCH AND SORT TOOLBAR */}
       <View style={styles.toolbar}>
@@ -672,10 +809,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         <TouchableOpacity
           onPress={() => {
             if (isSelectedCategoryViewerOnly) {
-              Alert.alert(
-                'Salt Okunur Klasör',
-                'Bu ortak klasörde salt okunur (viewer) yetkiniz bulunmaktadır. Yeni bağlantı eklenemez.'
-              );
+              showToast('Bu ortak klasörde salt okunur (viewer) yetkiniz var. Ekleme yapılamaz.', 'error');
               return;
             }
             setIsAddOpen(true);
@@ -710,7 +844,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 onPress={() => {
                   const writeableIds = processedKeeps.filter((k) => !isKeepReadOnly(k)).map((k) => k.id);
                   if (writeableIds.length === 0) {
-                    Alert.alert('Bilgi', 'Seçilebilecek yazılabilir bağlantı bulunamadı.');
+                    showToast('Seçilebilecek yazılabilir bağlantı bulunamadı.', 'info');
                     return;
                   }
                   setSelectedKeepIds(writeableIds);
@@ -893,23 +1027,36 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               </TouchableOpacity>
 
               {/* Other categories */}
-              {sortedCategories.map((cat) => (
-                <TouchableOpacity
-                  key={cat.id}
-                  onPress={() => setBulkSelectedCategoryId(cat.id)}
-                  style={[
-                    styles.categoryPickerItem,
-                    { backgroundColor: colors.background, borderColor: colors.border },
-                    bulkSelectedCategoryId === cat.id && { borderColor: colors.primary, backgroundColor: colors.border }
-                  ]}
-                >
-                  <Folder size={14} color={bulkSelectedCategoryId === cat.id ? colors.primary : colors.textMuted} style={{ marginRight: 10 }} />
-                  <Text style={[styles.categoryPickerText, { color: colors.text }, bulkSelectedCategoryId === cat.id && { color: colors.primary, fontWeight: '700' }]}>
-                    {cat.name}
-                  </Text>
-                  {bulkSelectedCategoryId === cat.id && <Check size={14} color={colors.primary} style={{ marginLeft: 'auto' }} />}
-                </TouchableOpacity>
-              ))}
+              {sortedCategories.map((cat) => {
+                const isSub = cat.isSubfolder;
+                return (
+                  <TouchableOpacity
+                    key={cat.id}
+                    onPress={() => setBulkSelectedCategoryId(cat.id)}
+                    style={[
+                      styles.categoryPickerItem,
+                      { backgroundColor: colors.background, borderColor: colors.border },
+                      isSub && { paddingLeft: 24, borderStyle: 'dashed' },
+                      bulkSelectedCategoryId === cat.id && { borderColor: colors.primary, backgroundColor: colors.border }
+                    ]}
+                  >
+                    {isSub ? (
+                      <CornerDownRight size={12} color={bulkSelectedCategoryId === cat.id ? colors.primary : colors.textMuted} style={{ marginRight: 6 }} />
+                    ) : (
+                      <Folder size={14} color={bulkSelectedCategoryId === cat.id ? colors.primary : colors.textMuted} style={{ marginRight: 10 }} />
+                    )}
+                    <Text style={[
+                      styles.categoryPickerText,
+                      { color: colors.text },
+                      isSub && { fontSize: 12 },
+                      bulkSelectedCategoryId === cat.id && { color: colors.primary, fontWeight: '700' }
+                    ]}>
+                      {cat.name}
+                    </Text>
+                    {bulkSelectedCategoryId === cat.id && <Check size={14} color={colors.primary} style={{ marginLeft: 'auto' }} />}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
 
             <View style={styles.modalFooter}>
@@ -928,7 +1075,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                     setIsSelectionMode(false);
                     fetchData(false);
                   } catch (err) {
-                    Alert.alert('Hata', 'Taşıma işlemi sırasında hata oluştu.');
+                    showToast('Taşıma işlemi sırasında hata oluştu.', 'error');
                   }
                 }}
                 style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]}
@@ -955,7 +1102,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             setIsSelectionMode(false);
             fetchData(false);
           } catch (err) {
-            Alert.alert('Hata', 'Toplu silme işlemi başarısız.');
+            showToast('Toplu silme işlemi başarısız.', 'error');
           }
         }}
         onCancel={() => setIsDeleteConfirmOpen(false)}
@@ -966,6 +1113,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         onClose={() => setIsProModalOpen(false)}
         feature={lockedFeature}
       />
+      <ClipboardDetect onSave={handleAutoSaveKeep} />
     </View>
   );
 };
@@ -1007,8 +1155,32 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     justifyContent: 'center',
   },
+  subcategoryBar: {
+    height: 42,
+    borderBottomWidth: 1,
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
+  subcategoryScroll: {
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    gap: 6,
+  },
+  subcategoryTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Radius.medium - 2,
+    borderWidth: 1,
+  },
+  subcategoryTabText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
   categoryScroll: {
-    paddingHorizontal: 16,
+    paddingLeft: 16,
+    paddingRight: 28,
     alignItems: 'center',
     gap: 8,
   },

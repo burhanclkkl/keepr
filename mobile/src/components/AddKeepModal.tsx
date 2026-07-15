@@ -10,10 +10,11 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Clipboard,
 } from 'react-native';
 import { Typography, Radius } from '../theme';
 import { useTheme } from '../context/ThemeContext';
-import { Plus, X, AlignLeft, Type } from 'lucide-react-native';
+import { Plus, X, AlignLeft, Type, CornerDownRight } from 'lucide-react-native';
 
 interface Category {
   id: number;
@@ -51,12 +52,12 @@ export const AddKeepModal: React.FC<AddKeepModalProps> = ({
 
   const sortedCategories = useMemo(() => {
     const rootCats = categories.filter(c => !c.parent_id);
-    const sorted: Category[] = [];
+    const sorted: (Category & { isSubfolder?: boolean; parentName?: string })[] = [];
     for (const root of rootCats) {
-      sorted.push(root);
+      sorted.push({ ...root, isSubfolder: false });
       const subCats = categories.filter(sub => sub.parent_id === root.id);
       for (const sub of subCats) {
-        sorted.push({ ...sub, name: `↳ ${sub.name}` });
+        sorted.push({ ...sub, isSubfolder: true, parentName: root.name });
       }
     }
     return sorted;
@@ -64,12 +65,36 @@ export const AddKeepModal: React.FC<AddKeepModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setUrl(prefilledUrl || '');
+      if (prefilledUrl) {
+        setUrl(prefilledUrl);
+      } else {
+        Clipboard.getString().then((text) => {
+          const trimmed = (text || '').trim();
+          if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.includes('.')) {
+            setUrl(trimmed);
+          } else {
+            setUrl('');
+          }
+        }).catch(() => {
+          setUrl('');
+        });
+      }
       setTitle('');
       setDescription('');
       setSelectedCategoryId(defaultCategoryId);
     }
   }, [isOpen, prefilledUrl, defaultCategoryId]);
+
+  const handlePaste = async () => {
+    try {
+      const text = await Clipboard.getString();
+      if (text) {
+        setUrl(text.trim());
+      }
+    } catch (err) {
+      console.log('Clipboard access error:', err);
+    }
+  };
 
   const handleAdd = async () => {
     if (!url.trim()) return;
@@ -114,20 +139,50 @@ export const AddKeepModal: React.FC<AddKeepModalProps> = ({
 
           {/* URL Input */}
           <Text style={[styles.label, { color: colors.textMuted }]}>Bağlantı Adresi (URL)</Text>
-          <TextInput
-            value={url}
-            onChangeText={setUrl}
-            placeholder="example.com/page"
-            placeholderTextColor={colors.textMuted}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            style={[styles.input, {
-              backgroundColor: colors.background,
-              color: colors.text,
-              borderColor: colors.border,
-            }]}
-          />
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            borderWidth: 1,
+            borderRadius: Radius.medium,
+            borderColor: colors.border,
+            backgroundColor: colors.background,
+            paddingRight: 8,
+            marginBottom: 12
+          }}>
+            <TextInput
+              value={url}
+              onChangeText={setUrl}
+              placeholder="example.com/page"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              style={{
+                flex: 1,
+                fontSize: 13,
+                fontWeight: '600',
+                paddingHorizontal: 12,
+                height: 42,
+                color: colors.text,
+              }}
+            />
+            <TouchableOpacity
+              onPress={handlePaste}
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: Radius.small,
+                backgroundColor: colors.card,
+                borderWidth: 1,
+                borderColor: colors.border,
+              }}
+              activeOpacity={0.6}
+            >
+              <Text style={{ fontSize: 9.5, fontWeight: '700', color: colors.primary }}>
+                Yapıştır
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Title Input */}
           <Text style={[styles.label, { color: colors.textMuted }]}>Başlık <Text style={{ fontWeight: '400', opacity: 0.6 }}>(opsiyonel)</Text></Text>
@@ -192,6 +247,7 @@ export const AddKeepModal: React.FC<AddKeepModalProps> = ({
 
               {sortedCategories.map((cat) => {
                 const isSelected = selectedCategoryId === cat.id;
+                const isSub = cat.isSubfolder;
                 return (
                   <TouchableOpacity
                     key={cat.id}
@@ -199,14 +255,26 @@ export const AddKeepModal: React.FC<AddKeepModalProps> = ({
                     style={[
                       styles.categoryBadge,
                       { backgroundColor: isSelected ? colors.primary : colors.background },
+                      isSub && {
+                        borderWidth: 1,
+                        borderStyle: 'dashed',
+                        borderColor: isSelected ? colors.primary : colors.border,
+                        paddingHorizontal: 8,
+                      }
                     ]}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.categoryText, {
-                      color: isSelected ? '#fff' : colors.textMuted,
-                    }]}>
-                      {cat.name}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      {isSub && (
+                        <CornerDownRight size={10} color={isSelected ? '#fff' : colors.primary} style={{ marginRight: 3 }} />
+                      )}
+                      <Text style={[styles.categoryText, {
+                        color: isSelected ? '#fff' : colors.textMuted,
+                        fontSize: isSub ? 10 : 11,
+                      }]}>
+                        {cat.name}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 );
               })}

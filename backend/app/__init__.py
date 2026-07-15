@@ -21,6 +21,8 @@ def create_app(config_class=Config):
     # Initialize Extensions
     db.init_app(app)
     migrate.init_app(app, db)
+    from app.extensions import limiter
+    limiter.init_app(app)
     # Configure CORS with origins from environment config.
     # Virgülle ayrılmış liste destekle: "https://a.com,https://b.com"
     raw_origins = app.config.get('CORS_ORIGINS', '*')
@@ -72,6 +74,54 @@ def create_app(config_class=Config):
 
     @app.route('/health', methods=['GET'])
     def health_check():
-        return {'status': 'healthy', 'message': 'Keepr API is up and running'}, 200
+        import sqlalchemy as sa
+        from datetime import datetime, timezone
+        from app.utils.mail_helper import check_smtp_status
+
+        # 1. Database Connection check
+        db_status = 'healthy'
+        db_details = ''
+        try:
+            db.session.execute(sa.text('SELECT 1')).scalar()
+            db_details = 'Database connection is active.'
+        except Exception as e:
+            db_status = 'unhealthy'
+            db_details = str(e)
+
+        # 2. SMTP Health check
+        smtp_check = check_smtp_status()
+
+        # 3. Scheduler Daemon check
+        scheduler_status = 'unhealthy'
+        scheduler_details = ''
+        scheduler_last_run = app.config.get('SCHEDULER_LAST_RUN')
+        if scheduler_last_run:
+            try:
+                last_run_dt = datetime.fromisoformat(scheduler_last_run)
+                # If scheduler ran in the last 60 seconds, it is healthy
+                now = datetime.now(timezone.utc)
+                delta = (now - last_run_dt).total_seconds()
+                if delta < 60:
+                    scheduler_status = 'healthy'
+                scheduler_details = f"Last run was {delta:.1f} seconds ago."
+            except Exception as e:
+                scheduler_details = f"Error checking time: {e}"
+        else:
+            scheduler_details = "Scheduler has not run yet."
+
+        overall_status = 'healthy' if (db_status == 'healthy' and scheduler_status == 'healthy' and smtp_check['status'] != 'error') else 'degraded'
+
+        return {
+            'status': overall_status,
+            'database': {
+                'status': db_status,
+                'details': db_details
+            },
+            'smtp': smtp_check,
+            'scheduler': {
+                'status': scheduler_status,
+                'details': scheduler_details
+            }
+        }, 200 if overall_status == 'healthy' else 500
 
     return app

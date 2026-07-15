@@ -19,6 +19,7 @@ from app.utils.errors import server_error
 from app.utils.verification_helpers import generate_otp, hash_otp, reset_verification_fields
 from app.utils.mail_helper import send_verification_email_async, send_password_reset_email_async
 from app.models.password_reset import PasswordReset
+from app.extensions import limiter
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -32,6 +33,7 @@ def create_auth_response(user):
     })
 
 @auth_bp.route('/register', methods=['POST'])
+@limiter.limit("5 per minute")
 def register():
     data = request.get_json() or {}
     
@@ -178,6 +180,7 @@ def register():
         return server_error('Kayıt işlemi sırasında bir hata oluştu.')
 
 @auth_bp.route('/login', methods=['POST'])
+@limiter.limit("5 per minute")
 def login():
     data = request.get_json() or {}
     
@@ -463,6 +466,7 @@ def delete_account(current_user):
         return server_error('Hesap silinirken hata oluştu.')
 
 @auth_bp.route('/verify-code', methods=['POST'])
+@limiter.limit("5 per minute")
 def verify_code():
     data = request.get_json() or {}
     email = data.get('email')
@@ -534,6 +538,7 @@ def verify_code():
     return jsonify({'error': 'Girdiğiniz doğrulama kodu geçersiz veya süresi dolmuş.'}), 400
 
 @auth_bp.route('/resend-code', methods=['POST'])
+@limiter.limit("5 per minute")
 def resend_code():
     data = request.get_json() or {}
     email = data.get('email')
@@ -587,6 +592,7 @@ def resend_code():
     return generic_success
 
 @auth_bp.route('/forgot-password', methods=['POST'])
+@limiter.limit("5 per minute")
 def forgot_password():
     """Şifre sıfırlama kodu ister. Kullanıcı sayımını (enumeration) önlemek için
     her durumda generic başarı yanıtı döner."""
@@ -647,6 +653,7 @@ def forgot_password():
 
 
 @auth_bp.route('/reset-password', methods=['POST'])
+@limiter.limit("5 per minute")
 def reset_password():
     """E-posta + kod + yeni şifre ile şifreyi sıfırlar. Başarılıysa tüm
     oturumlar (refresh token) iptal edilir."""

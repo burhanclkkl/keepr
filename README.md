@@ -299,3 +299,7 @@ npm run android # Android Emülatör için
 *   [ ] **Gerçek E-posta Sunucu Entegrasyonu:** SMTP e-posta sunucusu ile uygulama şifrelerinin canlı doğrulamalarının yapılması ve `.env` yapılandırması.
 *   [ ] **Detaylı İstatistikler:** Kullanıcının en çok kaydettiği siteleri, haftalık/aylık okuma alışkanlıklarını raporlayan grafiksel analiz paneli.
 *   [ ] **Çevrimdışı Mod (Offline Sync):** İnternet bağlantısı koptuğunda verilerin lokal bellekte (IndexedDB / SecureStore) saklanıp bağlantı gelen ilk anda senkronize edilmesi.
+
+
+git push origin main
+git pull origin main

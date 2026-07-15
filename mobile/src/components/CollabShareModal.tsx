@@ -16,6 +16,7 @@ import { useTheme } from '../context/ThemeContext';
 import { Typography, Radius } from '../theme';
 import api from '../services/api';
 import { API_URL } from '../config/api';
+import { ConfirmModal } from './ConfirmModal';
 
 interface Collaborator {
   id: number;
@@ -50,6 +51,7 @@ export const CollabShareModal: React.FC<CollabShareModalProps> = ({
   const [inviteRole, setInviteRole] = useState<'viewer' | 'editor'>('viewer');
   const [generatedLink, setGeneratedLink] = useState('');
   const [generatingLink, setGeneratingLink] = useState(false);
+  const [collabIdToRemove, setCollabIdToRemove] = useState<number | null>(null);
 
   useEffect(() => {
     if (isOpen && category) {
@@ -113,26 +115,8 @@ export const CollabShareModal: React.FC<CollabShareModalProps> = ({
     }
   };
 
-  const handleRemoveCollaborator = async (collabId: number) => {
-    Alert.alert(
-      'Ortağı Çıkar',
-      'Bu üyeyi klasör ortaklığından çıkarmak istediğinizden emin misiniz?',
-      [
-        { text: 'Vazgeç', style: 'cancel' },
-        {
-          text: 'Çıkar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await api.delete(`/api/collaborators/${collabId}`);
-              setCollaborators((prev) => prev.filter((c) => c.id !== collabId));
-            } catch (err) {
-              Alert.alert('Hata', 'Ortak klasörden çıkarılamadı.');
-            }
-          },
-        },
-      ]
-    );
+  const handleRemoveCollaborator = (collabId: number) => {
+    setCollabIdToRemove(collabId);
   };
 
   if (!category) return null;
@@ -353,6 +337,26 @@ export const CollabShareModal: React.FC<CollabShareModalProps> = ({
           />
         </View>
       </View>
+      <ConfirmModal
+        isOpen={collabIdToRemove !== null}
+        title="Ortağı Çıkar"
+        message="Bu üyeyi klasör ortaklığından çıkarmak istediğinizden emin misiniz?"
+        confirmText="Çıkar"
+        cancelText="Vazgeç"
+        variant="danger"
+        onConfirm={async () => {
+          if (collabIdToRemove === null) return;
+          try {
+            await api.delete(`/api/collaborators/${collabIdToRemove}`);
+            setCollaborators((prev) => prev.filter((c) => c.id !== collabIdToRemove));
+          } catch (err) {
+            Alert.alert('Hata', 'Ortak klasörden çıkarılamadı.');
+          } finally {
+            setCollabIdToRemove(null);
+          }
+        }}
+        onCancel={() => setCollabIdToRemove(null)}
+      />
     </Modal>
   );
 };

@@ -65,7 +65,12 @@ export const Inspector: React.FC<InspectorProps> = ({ keep, isOpen, onClose, onU
     if (!keep || !reminderTime) return;
     setIsUpdatingReminder(true);
     try {
-      const isoString = new Date(reminderTime).toISOString();
+      const parts = reminderTime.split('T');
+      const [datePart, timePart] = parts;
+      const [year, month, day] = datePart.split('-').map(Number);
+      const [hour, minute] = timePart.split(':').map(Number);
+      const dt = new Date(year, month - 1, day, hour, minute);
+      const isoString = dt.toISOString();
       const response = await api.post(`/api/keeps/${keep.id}/reminder`, { reminder_at: isoString });
       showToast('Alarm başarıyla kuruldu.');
       queryClient.invalidateQueries({ queryKey: ['keeps'] });

@@ -20,7 +20,10 @@ export const Header: React.FC<HeaderProps> = ({
   const { user } = useAuth();
 
   return (
-    <header className="md:hidden border-b border-gray-100 dark:border-[#1c1c1e] bg-white/80 dark:bg-[#0a0a0a]/80 backdrop-blur-md sticky top-0 z-30 px-4 py-3 flex flex-col gap-3">
+    <header 
+      style={{ transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)' }} 
+      className="md:hidden border-b border-gray-100 dark:border-[#1c1c1e] bg-white/80 dark:bg-[#0a0a0a]/80 backdrop-blur-md sticky top-0 z-30 px-4 py-3 flex flex-col gap-3"
+    >
       
       {/* Mobile Top Bar: User profile info & Settings */}
       <div className="flex items-center justify-between gap-4">
@@ -36,12 +39,12 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-semibold text-slate-500">@{user?.username}</span>
           {user?.subscription_type === 'pro' && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-black tracking-wider bg-accent/10 text-accent border border-accent/20 uppercase ml-1.5">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-bold tracking-wider bg-[#34C759] text-white uppercase ml-1.5 shadow-sm">
               PRO
             </span>
           )}
           {user?.subscription_type === 'team' && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-black tracking-wider bg-violet-500/10 text-violet-500 border border-violet-500/20 uppercase ml-1.5">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-bold tracking-wider bg-[#8B5CF6] text-white uppercase ml-1.5 shadow-sm">
               TEAM
             </span>
           )}

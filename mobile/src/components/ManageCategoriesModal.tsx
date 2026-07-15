@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Modal,
   ScrollView,
-  Alert,
   useColorScheme,
   Share,
   KeyboardAvoidingView,
@@ -16,10 +15,11 @@ import {
 } from 'react-native';
 import { Typography, Radius } from '../theme';
 import { useTheme } from '../context/ThemeContext';
-import { X, Plus, Folder, Trash2, Share2, Lock, Globe, Users } from 'lucide-react-native';
+import { X, Plus, Folder, Trash2, Share2, Lock, Globe, Users, CornerDownRight } from 'lucide-react-native';
 import { API_URL } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { CollabShareModal } from './CollabShareModal';
+import { ConfirmModal } from './ConfirmModal';
 
 interface Category {
   id: number;
@@ -55,14 +55,15 @@ export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [selectedParentId, setSelectedParentId] = useState<number | null>(null);
   const [collabShareCat, setCollabShareCat] = useState<Category | null>(null);
+  const [catToDelete, setCatToDelete] = useState<{ id: number; name: string } | null>(null);
+  const [warningModal, setWarningModal] = useState<{ title: string; message: string } | null>(null);
 
   const handleShare = (cat: Category) => {
     if (user?.subscription_type !== 'team') {
-      Alert.alert(
-        'Yetersiz Abonelik',
-        'Koleksiyon paylaşımı (Paylaşılan Klasör/Koleksiyon) özelliğini kullanabilmek için Team aboneliğine sahip olmanız gerekmektedir.',
-        [{ text: 'Tamam', style: 'default' }]
-      );
+      setWarningModal({
+        title: 'Yetersiz Abonelik',
+        message: 'Koleksiyon paylaşımı (Paylaşılan Klasör/Koleksiyon) özelliğini kullanabilmek için Team aboneliğine sahip olmanız gerekmektedir.'
+      });
       return;
     }
     setCollabShareCat(cat);
@@ -75,35 +76,23 @@ export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
       await onCreate(newCatName.trim(), selectedParentId);
       setNewCatName('');
       setSelectedParentId(null);
-    } catch (e) {
-      Alert.alert('Hata', 'Kategori eklenirken bir hata oluştu.');
+    } catch (e: any) {
+      // PRO_REQUIRED/TEAM_REQUIRED is handled by DashboardScreen's handleCreateCategory
+      // only show generic error for unexpected errors
+      const msg = e?.message;
+      if (msg !== 'PRO_REQUIRED' && msg !== 'TEAM_REQUIRED') {
+        setWarningModal({
+          title: 'Hata',
+          message: e?.response?.data?.error || e?.response?.data?.message || 'Kategori eklenirken bir hata oluştu.'
+        });
+      }
     } finally {
       setIsCreating(false);
     }
   };
 
   const handleDelete = (id: number, name: string) => {
-    Alert.alert(
-      'Kategoriyi Sil',
-      `"${name}" kategorisini silmek istediğinizden emin misiniz? Bu kategori altındaki bağlantılar silinmeyecek, "Genel" kategoriye taşınacaktır.`,
-      [
-        { text: 'Vazgeç', style: 'cancel' },
-        {
-          text: 'Sil',
-          style: 'destructive',
-          onPress: async () => {
-            setDeletingId(id);
-            try {
-              await onDelete(id);
-            } catch (e) {
-              Alert.alert('Hata', 'Kategori silinirken bir hata oluştu.');
-            } finally {
-              setDeletingId(null);
-            }
-          },
-        },
-      ]
-    );
+    setCatToDelete({ id, name });
   };
 
   return (
@@ -113,218 +102,191 @@ export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
-        {/* Backdrop */}
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={onClose}
-          style={styles.backdrop}
-        />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <View style={styles.overlay}>
+          {/* Backdrop (tap to close) */}
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={onClose}
+          />
 
-        {/* Bottom Sheet Container */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ width: '100%' }}
-        >
+          {/* Actual Sheet Content */}
           <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.text }]}>Kategorileri Yönet</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <X size={18} color={colors.textMuted} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Section: Create Category */}
-          <Text style={[styles.label, { color: colors.textMuted }]}>Yeni Kategori Adı</Text>
-          <View style={styles.createRow}>
-            <TextInput
-              value={newCatName}
-              onChangeText={setNewCatName}
-              placeholder="Örn: Yemek Tarifleri, Tasarım..."
-              placeholderTextColor={colors.textMuted}
-              style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
-            />
-            <TouchableOpacity
-              onPress={handleCreate}
-              disabled={isCreating || !newCatName.trim()}
-              style={[
-                styles.addBtn,
-                {
-                  backgroundColor: colors.primary,
-                  opacity: !newCatName.trim() ? 0.6 : 1,
-                },
-              ]}
-              activeOpacity={0.8}
-            >
-              {isCreating ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Plus size={16} color="#fff" />
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* Section: Select Parent Category */}
-          <Text style={[styles.label, { color: colors.textMuted, marginTop: 12 }]}>
-            Üst Klasör (Opsiyonel) {user?.subscription_type !== 'team' && '🔑 Team'}
-          </Text>
-          <View style={{ height: 32, marginBottom: 4 }}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.parentScroll}
-              contentContainerStyle={styles.parentContainer}
-            >
-              {/* Yok option */}
-              <TouchableOpacity
-                onPress={() => {
-                  if (user?.subscription_type !== 'team') {
-                    Alert.alert('Ekip Özelliği', 'Alt klasör oluşturma özelliği yalnızca Keepr Team üyelerine özeldir.');
-                    return;
-                  }
-                  setSelectedParentId(null);
-                }}
-                style={[
-                  styles.parentOption,
-                  selectedParentId === null && styles.parentOptionSelected,
-                  { borderColor: selectedParentId === null ? colors.primary : colors.border }
-                ]}
-                activeOpacity={0.7}
-              >
-                <Text style={[
-                  styles.parentOptionText,
-                  { color: selectedParentId === null ? colors.primary : colors.text }
-                ]}>
-                  Yok (Ana Klasör)
-                </Text>
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={[styles.title, { color: colors.text }]}>Kategorileri Yönet</Text>
+              <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+                <X size={18} color={colors.textMuted} />
               </TouchableOpacity>
+            </View>
 
-              {categories.filter(c => !c.parent_id).map((cat) => (
+            {/* Section: Create Category */}
+            <Text style={[styles.label, { color: colors.textMuted }]}>Yeni Kategori Adı</Text>
+            <View style={styles.createRow}>
+              <TextInput
+                value={newCatName}
+                onChangeText={setNewCatName}
+                placeholder="Örn: Yemek Tarifleri, Tasarım..."
+                placeholderTextColor={colors.textMuted}
+                style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+              />
+              <TouchableOpacity
+                onPress={handleCreate}
+                disabled={isCreating || !newCatName.trim()}
+                style={[
+                  styles.addBtn,
+                  {
+                    backgroundColor: colors.primary,
+                    opacity: !newCatName.trim() ? 0.6 : 1,
+                  },
+                ]}
+                activeOpacity={0.8}
+              >
+                {isCreating ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Plus size={16} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Section: Select Parent Category */}
+            <Text style={[styles.label, { color: colors.textMuted, marginTop: 12 }]}>
+              Üst Klasör (Opsiyonel) {(user?.subscription_type !== 'pro' && user?.subscription_type !== 'team') && '🔑 Pro'}
+            </Text>
+            <View style={{ height: 42, marginBottom: 8 }}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.parentScroll}
+                contentContainerStyle={styles.parentContainer}
+              >
+                {/* Yok option */}
                 <TouchableOpacity
-                  key={cat.id}
                   onPress={() => {
-                    if (user?.subscription_type !== 'team') {
-                      Alert.alert('Ekip Özelliği', 'Alt klasör oluşturma özelliği yalnızca Keepr Team üyelerine özeldir.');
+                    if (user?.subscription_type !== 'pro' && user?.subscription_type !== 'team') {
+                      setWarningModal({
+                        title: 'Pro Özelliği',
+                        message: 'Alt klasör oluşturma özelliği yalnızca Keepr Pro ve Team üyelerine özeldir.'
+                      });
                       return;
                     }
-                    setSelectedParentId(cat.id);
+                    setSelectedParentId(null);
                   }}
                   style={[
                     styles.parentOption,
-                    selectedParentId === cat.id && styles.parentOptionSelected,
-                    { borderColor: selectedParentId === cat.id ? colors.primary : colors.border }
+                    selectedParentId === null && styles.parentOptionSelected,
+                    { borderColor: selectedParentId === null ? colors.primary : colors.border }
                   ]}
                   activeOpacity={0.7}
                 >
-                  {user?.subscription_type !== 'team' && <Lock size={9} color={colors.textMuted} style={{ marginRight: 4 }} />}
                   <Text style={[
                     styles.parentOptionText,
-                    { color: selectedParentId === cat.id ? colors.primary : colors.text }
+                    { color: selectedParentId === null ? colors.primary : colors.text }
                   ]}>
-                    {cat.name}
+                    Yok (Ana Klasör)
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
 
-          {/* Section: Categories List */}
-          <Text style={[styles.label, { color: colors.textMuted, marginTop: 20, marginBottom: 8 }]}>
-            Mevcut Kategoriler
-          </Text>
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            style={styles.listScroll}
-            contentContainerStyle={styles.listContainer}
-          >
-            {categories.filter(c => !c.parent_id).length > 0 ? (
-              categories.filter(c => !c.parent_id).map((cat) => {
-                const subCats = categories.filter(sub => sub.parent_id === cat.id);
-                return (
-                  <View key={cat.id} style={{ marginBottom: 6 }}>
-                    {/* Parent Category Row */}
-                    <View style={[styles.categoryItem, { borderColor: colors.border }]}>
-                      <View style={styles.categoryLeft}>
-                        <Folder size={14} color={colors.primary} style={styles.folderIcon} />
-                        <View style={styles.nameContainer}>
-                          <Text style={[styles.categoryName, { color: colors.text }]}>
-                            {cat.name}
-                          </Text>
-                          {cat.is_public && (
-                            <View style={styles.sharedContainer}>
-                              <Globe size={9} color="#10B981" />
-                              <Text style={[styles.sharedBadge, { color: '#10B981' }]}>
-                                AÇIK
-                              </Text>
-                            </View>
-                          )}
-                          {cat.collaborator_role && (
-                            <View style={[styles.sharedContainer, { backgroundColor: 'rgba(139, 92, 246, 0.08)', borderColor: 'rgba(139, 92, 246, 0.15)', flexDirection: 'row', alignItems: 'center' }]}>
-                              <Users size={8} color="#8B5CF6" style={{ marginRight: 2 }} />
-                              <Text style={[styles.sharedBadge, { color: '#8B5CF6', fontSize: 7.5 }]}>
-                                EKİP ({cat.collaborator_role === 'editor' ? 'EDİTÖR' : 'İZLEYİCİ'})
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      </View>
+                {categories.filter(c => !c.parent_id).map((cat) => (
+                  <TouchableOpacity
+                    key={cat.id}
+                    onPress={() => {
+                      if (user?.subscription_type !== 'pro' && user?.subscription_type !== 'team') {
+                        setWarningModal({
+                          title: 'Pro Özelliği',
+                          message: 'Alt klasör oluşturma özelliği yalnızca Keepr Pro ve Team üyelerine özeldir.'
+                        });
+                        return;
+                      }
+                      if (cat.collaborator_role === 'viewer') {
+                        setWarningModal({
+                          title: 'Yetki Sınırı',
+                          message: 'İzleyici (Viewer) yetkiniz olan ortak klasörlerin altına alt klasör ekleyemezsiniz.'
+                        });
+                        return;
+                      }
+                      setSelectedParentId(cat.id);
+                    }}
+                    style={[
+                      styles.parentOption,
+                      selectedParentId === cat.id && styles.parentOptionSelected,
+                      { borderColor: selectedParentId === cat.id ? colors.primary : colors.border },
+                      cat.collaborator_role === 'viewer' && { opacity: 0.6 }
+                    ]}
+                    activeOpacity={0.7}
+                  >
+                    {cat.collaborator_role === 'viewer' ? (
+                      <Lock size={9} color="#F59E0B" style={{ marginRight: 4 }} />
+                    ) : (
+                      (user?.subscription_type !== 'pro' && user?.subscription_type !== 'team') && <Lock size={9} color={colors.textMuted} style={{ marginRight: 4 }} />
+                    )}
+                    <Text style={[
+                      styles.parentOptionText,
+                      { color: selectedParentId === cat.id ? colors.primary : (cat.collaborator_role === 'viewer' ? '#F59E0B' : colors.text) }
+                    ]}>
+                      {cat.name} {cat.collaborator_role === 'viewer' && '(İzleyici)'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
 
-                      <View style={styles.categoryActions}>
-                        {!cat.collaborator_role && (
-                          <>
-                            <TouchableOpacity
-                              onPress={() => handleShare(cat)}
-                              style={styles.actionBtn}
-                              activeOpacity={0.6}
-                            >
-                              {user?.subscription_type !== 'team' && (
-                                <Lock size={7} color="#F59E0B" style={{ position: 'absolute', top: 2, right: 2 }} />
-                              )}
-                              <Share2 size={13} color={cat.is_public ? colors.primary : colors.textMuted} />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              onPress={() => handleDelete(cat.id, cat.name)}
-                              disabled={deletingId !== null}
-                              style={styles.actionBtn}
-                              activeOpacity={0.6}
-                            >
-                              {deletingId === cat.id ? (
-                                <ActivityIndicator color={colors.error} size="small" />
-                              ) : (
-                                <Trash2 size={13} color={colors.error} />
-                              )}
-                            </TouchableOpacity>
-                          </>
-                        )}
-                      </View>
-                    </View>
-
-                    {/* Subcategories (Indented) */}
-                    {subCats.map((sub) => (
-                      <View
-                        key={sub.id}
-                        style={[
-                          styles.categoryItem,
-                          {
-                            borderColor: colors.border,
-                            paddingLeft: 24,
-                            borderBottomWidth: 0.5,
-                            opacity: 0.9
-                          }
-                        ]}
-                      >
+            {/* Section: Categories List */}
+            <Text style={[styles.label, { color: colors.textMuted, marginTop: 20, marginBottom: 8 }]}>
+              Mevcut Kategoriler
+            </Text>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={styles.listScroll}
+              contentContainerStyle={styles.listContainer}
+            >
+              {categories.filter(c => !c.parent_id).length > 0 ? (
+                categories.filter(c => !c.parent_id).map((cat) => {
+                  const subCats = categories.filter(sub => sub.parent_id === cat.id);
+                  return (
+                    <View key={cat.id} style={{ marginBottom: 6 }}>
+                      {/* Parent Category Row */}
+                      <View style={[styles.categoryItem, { borderColor: colors.border }]}>
                         <View style={styles.categoryLeft}>
-                          <Folder size={12} color={colors.textMuted} style={[styles.folderIcon, { opacity: 0.6 }]} />
+                          <Folder size={14} color={colors.primary} style={styles.folderIcon} />
                           <View style={styles.nameContainer}>
-                            <Text style={[styles.categoryName, { color: colors.text, fontSize: 12 }]}>
-                              {sub.name}
+                            <Text style={[styles.categoryName, { color: colors.text }]}>
+                              {cat.name}
                             </Text>
-                            {sub.collaborator_role && (
-                              <View style={[styles.sharedContainer, { backgroundColor: 'rgba(139, 92, 246, 0.08)', borderColor: 'rgba(139, 92, 246, 0.15)', flexDirection: 'row', alignItems: 'center' }]}>
-                                <Users size={8} color="#8B5CF6" style={{ marginRight: 2 }} />
-                                <Text style={[styles.sharedBadge, { color: '#8B5CF6', fontSize: 7.5 }]}>
-                                  EKİP
+                            {cat.is_public && (
+                              <View style={styles.sharedContainer}>
+                                <Globe size={9} color="#10B981" />
+                                <Text style={[styles.sharedBadge, { color: '#10B981' }]}>
+                                  AÇIK
+                                </Text>
+                              </View>
+                            )}
+                            {cat.collaborator_role && (
+                              <View style={[
+                                styles.sharedContainer,
+                                cat.collaborator_role === 'viewer'
+                                  ? { backgroundColor: 'rgba(245, 158, 11, 0.08)', borderColor: 'rgba(245, 158, 11, 0.15)' }
+                                  : { backgroundColor: 'rgba(139, 92, 246, 0.08)', borderColor: 'rgba(139, 92, 246, 0.15)' },
+                                { flexDirection: 'row', alignItems: 'center' }
+                              ]}>
+                                {cat.collaborator_role === 'viewer' ? (
+                                  <Lock size={8} color="#F59E0B" style={{ marginRight: 2 }} />
+                                ) : (
+                                  <Users size={8} color="#8B5CF6" style={{ marginRight: 2 }} />
+                                )}
+                                <Text style={[
+                                  styles.sharedBadge,
+                                  {
+                                    color: cat.collaborator_role === 'viewer' ? '#F59E0B' : '#8B5CF6',
+                                    fontSize: 7.5
+                                  }
+                                ]}>
+                                  EKİP ({cat.collaborator_role === 'viewer' ? 'İZLEYİCİ' : 'EDİTÖR'})
                                 </Text>
                               </View>
                             )}
@@ -332,37 +294,117 @@ export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
                         </View>
 
                         <View style={styles.categoryActions}>
-                          {!sub.collaborator_role && (
-                            <TouchableOpacity
-                              onPress={() => handleDelete(sub.id, sub.name)}
-                              disabled={deletingId !== null}
-                              style={styles.actionBtn}
-                              activeOpacity={0.6}
-                            >
-                              {deletingId === sub.id ? (
-                                <ActivityIndicator color={colors.error} size="small" />
-                              ) : (
-                                <Trash2 size={12} color={colors.error} />
-                              )}
-                            </TouchableOpacity>
+                          {!cat.collaborator_role && (
+                            <>
+                              <TouchableOpacity
+                                onPress={() => handleShare(cat)}
+                                style={styles.actionBtn}
+                                activeOpacity={0.6}
+                              >
+                                {user?.subscription_type !== 'team' && (
+                                  <Lock size={7} color="#F59E0B" style={{ position: 'absolute', top: 2, right: 2 }} />
+                                )}
+                                <Share2 size={13} color={cat.is_public ? colors.primary : colors.textMuted} />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                onPress={() => handleDelete(cat.id, cat.name)}
+                                disabled={deletingId !== null}
+                                style={styles.actionBtn}
+                                activeOpacity={0.6}
+                              >
+                                {deletingId === cat.id ? (
+                                  <ActivityIndicator color={colors.error} size="small" />
+                                ) : (
+                                  <Trash2 size={13} color={colors.error} />
+                                )}
+                              </TouchableOpacity>
+                            </>
                           )}
                         </View>
                       </View>
-                    ))}
-                  </View>
-                );
-              })
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-                  Henüz özel bir kategori oluşturmamışsınız.
-                </Text>
-              </View>
-            )}
-          </ScrollView>
+
+                      {/* Subcategories (Indented) */}
+                      {subCats.map((sub) => (
+                        <View
+                          key={sub.id}
+                          style={[
+                            styles.categoryItem,
+                            {
+                              borderColor: colors.border,
+                              paddingLeft: 20,
+                              borderBottomWidth: 1,
+                              borderStyle: 'dashed',
+                              backgroundColor: colors.background,
+                              opacity: 0.95
+                            }
+                          ]}
+                        >
+                          <View style={styles.categoryLeft}>
+                            <CornerDownRight size={12} color={colors.textMuted} style={{ marginRight: 6 }} />
+                            <Folder size={11} color={colors.textMuted} style={[styles.folderIcon, { marginRight: 6, opacity: 0.7 }]} />
+                            <View style={styles.nameContainer}>
+                              <Text style={[styles.categoryName, { color: colors.text, fontSize: 12, fontWeight: '500' }]}>
+                                {sub.name}
+                              </Text>
+                              {sub.collaborator_role && (
+                                <View style={[
+                                  styles.sharedContainer,
+                                  sub.collaborator_role === 'viewer'
+                                    ? { backgroundColor: 'rgba(245, 158, 11, 0.08)', borderColor: 'rgba(245, 158, 11, 0.15)' }
+                                    : { backgroundColor: 'rgba(139, 92, 246, 0.08)', borderColor: 'rgba(139, 92, 246, 0.15)' },
+                                  { flexDirection: 'row', alignItems: 'center' }
+                                ]}>
+                                  {sub.collaborator_role === 'viewer' ? (
+                                    <Lock size={8} color="#F59E0B" style={{ marginRight: 2 }} />
+                                  ) : (
+                                    <Users size={8} color="#8B5CF6" style={{ marginRight: 2 }} />
+                                  )}
+                                  <Text style={[
+                                    styles.sharedBadge,
+                                    {
+                                      color: sub.collaborator_role === 'viewer' ? '#F59E0B' : '#8B5CF6',
+                                      fontSize: 7.5
+                                    }
+                                  ]}>
+                                    EKİP ({sub.collaborator_role === 'viewer' ? 'İZLEYİCİ' : 'EDİTÖR'})
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+
+                          <View style={styles.categoryActions}>
+                            {!sub.collaborator_role && (
+                              <TouchableOpacity
+                                onPress={() => handleDelete(sub.id, sub.name)}
+                                disabled={deletingId !== null}
+                                style={styles.actionBtn}
+                                activeOpacity={0.6}
+                              >
+                                {deletingId === sub.id ? (
+                                  <ActivityIndicator color={colors.error} size="small" />
+                                ) : (
+                                  <Trash2 size={12} color={colors.error} />
+                                )}
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  );
+                })
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+                    Henüz özel bir kategori oluşturmamışsınız.
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
         </View>
-        </KeyboardAvoidingView>
-      </View>
+      </KeyboardAvoidingView>
       <CollabShareModal
         isOpen={collabShareCat !== null}
         category={collabShareCat}
@@ -375,6 +417,40 @@ export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
           }
           return updated;
         }}
+      />
+      <ConfirmModal
+        isOpen={catToDelete !== null}
+        title="Kategoriyi Sil"
+        message={`"${catToDelete?.name}" kategorisini silmek istediğinizden emin misiniz? Bu kategori altındaki bağlantılar silinmeyecek, "Genel" kategoriye taşınacaktır.`}
+        confirmText="Sil"
+        cancelText="Vazgeç"
+        variant="danger"
+        onConfirm={async () => {
+          if (!catToDelete) return;
+          const id = catToDelete.id;
+          setCatToDelete(null);
+          setDeletingId(id);
+          try {
+            await onDelete(id);
+          } catch (e) {
+            setWarningModal({
+              title: 'Hata',
+              message: 'Kategori silinirken bir hata oluştu.'
+            });
+          } finally {
+            setDeletingId(null);
+          }
+        }}
+        onCancel={() => setCatToDelete(null)}
+      />
+      <ConfirmModal
+        isOpen={warningModal !== null}
+        title={warningModal?.title || ''}
+        message={warningModal?.message || ''}
+        confirmText="Tamam"
+        singleButton
+        onConfirm={() => setWarningModal(null)}
+        onCancel={() => setWarningModal(null)}
       />
     </Modal>
   );
@@ -497,7 +573,7 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   parentScroll: {
-    height: 32,
+    height: 40,
   },
   parentContainer: {
     paddingRight: 10,
@@ -507,7 +583,7 @@ const styles = StyleSheet.create({
   parentOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 30,
+    height: 36,
     paddingHorizontal: 12,
     borderWidth: 1,
     borderRadius: Radius.medium,
@@ -517,7 +593,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(99, 102, 241, 0.08)',
   },
   parentOptionText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
   },
   emptyContainer: {
